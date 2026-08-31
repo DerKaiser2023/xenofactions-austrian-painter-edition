@@ -362,18 +362,27 @@ public class GUIHandler implements IGuiHandler {
 				return null;
 			}
 
-			case ModBlocks.guiID_fed:
+		case ModBlocks.guiID_fed:
+		{
+			if(entity instanceof TileEntityMachineFederalReserve)
 			{
-				if(entity instanceof TileEntityMachineFederalReserve)
-				{
-					return new ContainerMachineFed(player.inventory, (TileEntityMachineFederalReserve) entity);
-				}
-				return null;
+				return new ContainerMachineFed(player.inventory, (TileEntityMachineFederalReserve) entity);
 			}
-
+			return null;
 		}
-		return null;
+
+		case ModBlocks.guiID_research:
+		{
+			return new com.hfr.technology.gui.ContainerResearch(player);
+		}
+		case ModBlocks.guiID_purchase:
+		{
+			return new com.hfr.technology.gui.ContainerPurchase(player);
+		}
+
 	}
+	return null;
+}
 
 	@Override
 	public Object getClientGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
@@ -701,6 +710,14 @@ public class GUIHandler implements IGuiHandler {
 				case ModItems.guiID_slbm:
 				{
 					return new GUIScreenSLBM(player);
+				}
+				case ModBlocks.guiID_research:
+				{
+					return new com.hfr.technology.gui.GUIResearch();
+				}
+				case ModBlocks.guiID_purchase:
+				{
+					return new com.hfr.technology.gui.GUIPurchase();
 				}
 			}
 		}

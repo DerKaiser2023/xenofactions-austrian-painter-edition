@@ -151,6 +151,11 @@ public class ModBlocks {
 
 	public static final int guiID_fed = 38;
 
+	public static Block research_block;
+	public static Block purchase_block;
+	public static final int guiID_research = 100;
+	public static final int guiID_purchase = 101;
+
 	public static Block barricade;
 
 	public static Block wallImageBlock;
@@ -181,6 +186,10 @@ public class ModBlocks {
 	public static final int guiID_naval = 8;
 
 	public static Block debug;
+	public static Block research_block;
+	public static Block purchase_block;
+	public static final int guiID_research = 100;
+	public static final int guiID_purchase = 101;
 	//public static Block steam;
 	//public static Block oil;
 	//public static Block gas;
@@ -288,7 +297,10 @@ public class ModBlocks {
 
 		machine_foundry = new MachineFoundry(Material.iron).setStepSound(soundTypeConcrete).setBlockName("machine_foundry").setHardness(5.0F).setResistance(0.0F).setCreativeTab(MainRegistry.tab).setBlockTextureName(RefStrings.MODID + ":machine_foundry");
 
+		research_block = new com.hfr.technology.ResearchBlock();
+		purchase_block = new com.hfr.technology.PurchaseBlock();
 
+		
 		
 		clowder_flag = new Flag(Material.iron).setStepSound(soundTypeMetal).setBlockName("clowder_flag").setHardness(5.0F).setResistance(Float.POSITIVE_INFINITY).setCreativeTab(MainRegistry.tab).setBlockTextureName(RefStrings.MODID + ":clowder_flag");
 		clowder_cap = new Cap(Material.iron).setStepSound(soundTypeMetal).setBlockName("clowder_cap").setHardness(Float.POSITIVE_INFINITY).setResistance(Float.POSITIVE_INFINITY).setCreativeTab(null).setBlockTextureName(RefStrings.MODID + ":clowder_cap");
@@ -363,8 +375,10 @@ public class ModBlocks {
 		GameRegistry.registerBlock(machine_waterwheel, ItemBlockLore.class, machine_waterwheel.getUnlocalizedName());
 		GameRegistry.registerBlock(machine_diesel, ItemBlockLore.class, machine_diesel.getUnlocalizedName());
 
-
 		GameRegistry.registerBlock(machine_foundry, machine_foundry.getUnlocalizedName());
+
+		GameRegistry.registerBlock(research_block, research_block.getUnlocalizedName());
+		GameRegistry.registerBlock(purchase_block, purchase_block.getUnlocalizedName());
 
 		GameRegistry.registerBlock(machine_market, ItemBlockUnstackable.class, machine_market.getUnlocalizedName());
 

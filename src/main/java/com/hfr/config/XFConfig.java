@@ -44,7 +44,9 @@ public final class XFConfig {
 	public static final String CAT_EARTH_WORLD = "XENOFACTIONS_18_EARTH_WORLD";
 	public static final String CAT_BUILDERS = "XENOFACTIONS_19_BUILDERS";
 	public static final String CAT_TDM = "XENOFACTIONS_20_TDM";
-	public static boolean tdmBombUnknownRemovalAsDefuse = true;
+	public static final String CAT_TECHNOLOGY = "XENOFACTIONS_21_TECHNOLOGY";
+    public static final String CAT_TECHNOLOGY = "XENOFACTIONS_21_TECHNOLOGY";
+    public static boolean tdmBombUnknownRemovalAsDefuse = true;
 	public static boolean tdmBombLifecycleDebug = false;
 	public static boolean enableFactionBuilders = true;
 	public static int builderWorkIntervalTicks = 10;

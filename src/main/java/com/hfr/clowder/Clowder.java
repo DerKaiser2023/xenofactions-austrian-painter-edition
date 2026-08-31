@@ -19,6 +19,7 @@ import com.hfr.packet.PacketDispatcher;
 import com.hfr.packet.effect.AuxParticlePacketNT;
 //import com.hfr.data.MarketData.Offer;
 import com.hfr.main.MainRegistry;
+import com.hfr.technology.FactionTechnologyData;
 import com.hfr.util.XFLog;
 import com.hfr.tileentity.clowder.TileEntityFlag;
 import com.hfr.tileentity.prop.TileEntityProp;
@@ -182,6 +183,7 @@ public class Clowder {
 	public long relocationStarted, relocationExpires;
 	public HashMap<String, List<Long>> cityRelocationHistory = new HashMap<String, List<Long>>();
 	private int lastBankruptcyStage = 0;
+	public FactionTechnologyData techData;
 
 	public static List<Clowder> clowders = new ArrayList();
 	public static HashMap<UUID, Clowder> inverseMap = new HashMap<UUID, Clowder>();
@@ -1842,6 +1844,12 @@ public class Clowder {
 		}
 		nbt.setInteger(i + "_relocationHistoryCount", relocationHistoryIndex);
 
+		if (techData != null) {
+			NBTTagCompound techTag = new NBTTagCompound();
+			techData.writeToNBT(techTag);
+			nbt.setTag("techData", techTag);
+		}
+
 		///poorly coded "treaty" system///
 		//nbt.setString(i + "_treaty1", this.treaty1);
 		//nbt.setString(i + "_treaty2", this.treaty2);
@@ -2125,6 +2133,10 @@ public class Clowder {
 			c.noWarUntil.put(nbt.getString(i + "_" + j + "_nwu_n"), nbt.getLong(i + "_" + j + "_nwu_t"));
 		for (int j = 0; j < cfanwu; j++)
 			c.formerAllyNoWarUntil.put(nbt.getString(i + "_" + j + "_fanwu_n"), nbt.getLong(i + "_" + j + "_fanwu_t"));
+
+		if (nbt.hasKey("techData")) {
+			c.techData = FactionTechnologyData.readFromNBT(nbt.getCompoundTag("techData"));
+		}
 
 		return c;
 	}

@@ -435,10 +435,25 @@ public class MainRegistry
 		ModBlocks.mainRegistry();
 		ModItems.mainRegistry();
 		loadConfig(PreEvent);
+		if(com.hfr.config.XFConfig.CAT_TECHNOLOGY != null) {
+			try {
+				com.hfr.technology.TechnologyManager.init(PreEvent.getModConfigurationDirectory().getAbsolutePath() + "/XenoFactions.cfg");
+			} catch (Exception e) {
+				if(logger != null) logger.warn("[XF] Failed to init technology system: " + e.getMessage());
+			}
+		}
 		SchematicLibrary.get().initialize(PreEvent.getModConfigurationDirectory());
 		com.hfr.world.earth.XFEarthRegistry.register();
 		MinecraftForge.EVENT_BUS.register(new com.hfr.world.earth.XFEarthWorldValidationHandler());
 		CraftingManager.mainRegistry();
+		GameRegistry.registerItem(new com.hfr.technology.ResearchBook(), "research_book");
+		if(XFConfig.CAT_TECHNOLOGY != null) {
+			try {
+				com.hfr.technology.TechnologyManager.init(null);
+			} catch (Exception e) {
+				MainRegistry.logger.warn("[XF] Failed to init technology system: " + e.getMessage());
+			}
+		}
 		proxy.registerRenderInfo();
 		FluidHandler.init();
 		HFRPotion.init();
@@ -744,10 +759,11 @@ public class MainRegistry
 		ClowderEvents clowder = new ClowderEvents();
 		com.hfr.journeymap.ClaimOverlaySync claimOverlaySync = new com.hfr.journeymap.ClaimOverlaySync();
 		XFDynmapIntegration dynmap = new XFDynmapIntegration();
-		//WorldController pon4 = new WorldController();
+		com.hfr.technology.TechnologyCraftingHandler techCraftingHandler = new com.hfr.technology.TechnologyCraftingHandler();
 
 		FMLCommonHandler.instance().bus().register(handler);
 		FMLCommonHandler.instance().bus().register(clowder);
+		FMLCommonHandler.instance().bus().register(techCraftingHandler);
 		FMLCommonHandler.instance().bus().register(claimOverlaySync);
 		FMLCommonHandler.instance().bus().register(new StoneDropSnapshotSync());
 		FMLCommonHandler.instance().bus().register(new MachineDisplaySnapshotSync());

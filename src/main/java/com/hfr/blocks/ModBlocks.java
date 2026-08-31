@@ -186,10 +186,6 @@ public class ModBlocks {
 	public static final int guiID_naval = 8;
 
 	public static Block debug;
-	public static Block research_block;
-	public static Block purchase_block;
-	public static final int guiID_research = 100;
-	public static final int guiID_purchase = 101;
 	//public static Block steam;
 	//public static Block oil;
 	//public static Block gas;
@@ -297,8 +293,10 @@ public class ModBlocks {
 
 		machine_foundry = new MachineFoundry(Material.iron).setStepSound(soundTypeConcrete).setBlockName("machine_foundry").setHardness(5.0F).setResistance(0.0F).setCreativeTab(MainRegistry.tab).setBlockTextureName(RefStrings.MODID + ":machine_foundry");
 
-		research_block = new com.hfr.technology.ResearchBlock();
-		purchase_block = new com.hfr.technology.PurchaseBlock();
+		if(com.hfr.technology.TechnologyManager.isEnabled()) {
+			research_block = new com.hfr.technology.ResearchBlock();
+			purchase_block = new com.hfr.technology.PurchaseBlock();
+		}
 
 		
 		
@@ -377,8 +375,8 @@ public class ModBlocks {
 
 		GameRegistry.registerBlock(machine_foundry, machine_foundry.getUnlocalizedName());
 
-		GameRegistry.registerBlock(research_block, research_block.getUnlocalizedName());
-		GameRegistry.registerBlock(purchase_block, purchase_block.getUnlocalizedName());
+		if(research_block != null) GameRegistry.registerBlock(research_block, research_block.getUnlocalizedName());
+		if(purchase_block != null) GameRegistry.registerBlock(purchase_block, purchase_block.getUnlocalizedName());
 
 		GameRegistry.registerBlock(machine_market, ItemBlockUnstackable.class, machine_market.getUnlocalizedName());
 

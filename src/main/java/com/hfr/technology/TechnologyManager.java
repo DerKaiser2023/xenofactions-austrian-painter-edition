@@ -3,8 +3,10 @@ package com.hfr.technology;
 import java.util.*;
 
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.world.World;
+import net.minecraftforge.common.config.Configuration;
+import com.hfr.util.XFLog;
 import com.hfr.clowder.Clowder;
 
 public class TechnologyManager {
@@ -42,6 +44,8 @@ public class TechnologyManager {
     }
 
     public static boolean isResearched(EntityPlayer player, String techId) {
+        Technology tech = getTechnology(techId);
+        if (tech != null && tech.type == TechnologyType.FREE) return true;
         if (!isEnabled()) return true;
         Clowder clowder = getFaction(player);
         if (clowder == null || clowder.techData == null) return false;
@@ -49,6 +53,8 @@ public class TechnologyManager {
     }
 
     public static boolean isPurchased(EntityPlayer player, String techId) {
+        Technology tech = getTechnology(techId);
+        if (tech != null && tech.type == TechnologyType.FREE) return true;
         if (!isEnabled()) return true;
         Clowder clowder = getFaction(player);
         if (clowder == null || clowder.techData == null) return false;
@@ -56,6 +62,8 @@ public class TechnologyManager {
     }
 
     public static boolean isUnlocked(EntityPlayer player, String techId) {
+        Technology tech = getTechnology(techId);
+        if (tech != null && tech.type == TechnologyType.FREE) return true;
         if (!isEnabled()) return true;
         Clowder clowder = getFaction(player);
         if (clowder == null || clowder.techData == null) return false;
@@ -72,7 +80,7 @@ public class TechnologyManager {
         if (clowder == null || clowder.techData == null) return false;
         if (clowder.techData.isResearched(techId)) return false;
         for (String pre : tech.prerequisites) {
-            if (!clowder.techData.isResearched(pre)) return false;
+            if (!isUnlocked(player, pre)) return false;
         }
         return true;
     }

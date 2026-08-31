@@ -432,28 +432,16 @@ public class MainRegistry
 		if(logger == null)
 			logger = PreEvent.getModLog();
 
+		loadConfig(PreEvent);
+		com.hfr.technology.TechnologyManager.init(config);
 		ModBlocks.mainRegistry();
 		ModItems.mainRegistry();
-		loadConfig(PreEvent);
-		if(com.hfr.config.XFConfig.CAT_TECHNOLOGY != null) {
-			try {
-				com.hfr.technology.TechnologyManager.init(PreEvent.getModConfigurationDirectory().getAbsolutePath() + "/XenoFactions.cfg");
-			} catch (Exception e) {
-				if(logger != null) logger.warn("[XF] Failed to init technology system: " + e.getMessage());
-			}
-		}
 		SchematicLibrary.get().initialize(PreEvent.getModConfigurationDirectory());
 		com.hfr.world.earth.XFEarthRegistry.register();
 		MinecraftForge.EVENT_BUS.register(new com.hfr.world.earth.XFEarthWorldValidationHandler());
 		CraftingManager.mainRegistry();
-		GameRegistry.registerItem(new com.hfr.technology.ResearchBook(), "research_book");
-		if(XFConfig.CAT_TECHNOLOGY != null) {
-			try {
-				com.hfr.technology.TechnologyManager.init(null);
-			} catch (Exception e) {
-				MainRegistry.logger.warn("[XF] Failed to init technology system: " + e.getMessage());
-			}
-		}
+		if(com.hfr.technology.TechnologyManager.isEnabled())
+			GameRegistry.registerItem(new com.hfr.technology.ResearchBook(), "research_book");
 		proxy.registerRenderInfo();
 		FluidHandler.init();
 		HFRPotion.init();

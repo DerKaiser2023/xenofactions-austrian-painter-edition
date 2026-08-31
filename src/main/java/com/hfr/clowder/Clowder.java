@@ -183,7 +183,7 @@ public class Clowder {
 	public long relocationStarted, relocationExpires;
 	public HashMap<String, List<Long>> cityRelocationHistory = new HashMap<String, List<Long>>();
 	private int lastBankruptcyStage = 0;
-	public FactionTechnologyData techData;
+	public FactionTechnologyData techData = new FactionTechnologyData();
 
 	public static List<Clowder> clowders = new ArrayList();
 	public static HashMap<UUID, Clowder> inverseMap = new HashMap<UUID, Clowder>();

@@ -71,3 +71,10 @@ saves/
 /earthmaps-input/*.xfmap
 /eclipse
 *.hprof
+
+# Version the technology-tree guide, but not server-generated configuration.
+!config/
+config/*
+!config/techtree/
+config/techtree/*
+!config/techtree/README.md

@@ -6,7 +6,6 @@ import java.util.*;
 import com.google.gson.*;
 import com.hfr.util.XFLog;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.config.Configuration;
 
 public class TechnologyLoader {
@@ -53,7 +52,7 @@ public class TechnologyLoader {
         TechnologyType type = TechnologyType.FREE;
         if (obj.has("type")) {
             try {
-                type = TechnologyType.valueOf(obj.get("type").getAsString().toUpperCase());
+                type = TechnologyType.valueOf(obj.get("type").getAsString().toUpperCase().replace(-, _));
             } catch (IllegalArgumentException e) {
                 XFLog.warn("[Technology] Unknown type '" + obj.get("type").getAsString() + "' for " + id + ", defaulting to FREE");
             }

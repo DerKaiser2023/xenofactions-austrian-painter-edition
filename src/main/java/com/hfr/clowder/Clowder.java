@@ -983,6 +983,8 @@ public class Clowder {
 
 
 	public boolean addMember(World world, String name) {
+		if (FactionMembershipGuard.isBlocked(world))
+			return false;
 
 		if (world.getPlayerEntityByName(name) == null)
 			return false;
@@ -2440,7 +2442,10 @@ public class Clowder {
 		return null;
 	}
 
-	public static void createClowder(EntityPlayer player, String name) {
+	public static boolean createClowder(EntityPlayer player, String name) {
+
+		if (player == null || FactionMembershipGuard.isBlocked(player.worldObj))
+			return false;
 
 		String leader = player.getGameProfile().getName();
 		UUID leaderUuid = player.getUniqueID();
@@ -2474,6 +2479,7 @@ public class Clowder {
 		inverseMap.put(leaderUuid, c);
 
 		ClowderData.getData(player.worldObj).markDirty();
+		return true;
 	}
 
 	// the thing that adds prestige to prestige bank - allah note

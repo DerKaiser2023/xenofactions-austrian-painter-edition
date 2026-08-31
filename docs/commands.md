@@ -183,6 +183,8 @@ Player commands are `/tdm menu`, `/tdm maps`, `/tdm vote <map>`, `/tdm skip [yes
 
 Deathmatch and FFA are continuous modes: login and respawn place a player immediately at a mode-appropriate spawn and open a protected respawn-loadout selector. That selector ignores kit prices, buy score, survivor kits, and BOMB buy timing. FFA loadouts may be selected from either configured RED or BLUE kit pool, but FFA does not assign a team. Competitive BOMB alone owns economy and survivor-kit state; active hardcore BOMB late joiners retain the established round-waiting behavior.
 
+`/tdm skip [yes|no|status]` starts or participates in a vote to skip the current map. Player messages identify the purpose of the vote, show the YES threshold, and announce whether the map will be skipped, the vote failed, or it expired.
+
 Map-specific spawns are authoritative, including their configured dimensions. Legacy global spawns are used only when the selected map has no map-specific spawn data. A match with missing required spawns is refused and logged rather than falling through to vanilla worldspawn. Mode changes stop the old lifecycle and clear pending kit, protection, waiting, elimination, objective, and survivor state before starting the new mode.
 
 ## Registered-but-not-currently-registered commands
@@ -231,3 +233,21 @@ Reward amounts must be non-negative; zero disables that reward. FFA competitors 
 # TDM sound diagnostics
 
 `/tdm testsound <ctwin|twin|ctstart|tstart|bombplant>` is operator-only. It selects from the live configured variants and uses the same explicit per-player packet dispatcher as gameplay. Round-start tests play only for the executing operator; victory and bomb-plant tests target the eligible TDM players in the operator's current world.
+
+## TDM score and purchase commands
+
+TDM keeps three unrelated score domains: BOMB **buy score** is money, optional **kill score** buys killstreak rewards, and non-spendable **point score** decides DEATHMATCH/FFA victory. Normal DEATHMATCH/FFA kits remain economy-free.
+
+Player commands:
+- `/tdm menu` opens the mode-aware scoreboard/loadout menu. BOMB buy time exposes Utility; configured DEATHMATCH/FFA maps expose Killstreaks and the player's kill-score balance.
+- `/tdm utility list` and `/tdm utility buy <number>` list or buy BOMB utility with buy score.
+- `/tdm killstreak list` and `/tdm killstreak buy <number>` list or queue a respawn reward using kill score.
+
+Administrator commands:
+- `/tdm utility <list|add|remove> [map|global] [cost|number]` captures additive utility definitions from the administrator's inventory.
+- `/tdm killstreak <list|add|remove> [map|global] [cost|number]` captures queued killstreak definitions from the administrator's inventory.
+- `/tdm map pointlimit <map> <points|default>` sets the non-BOMB victory threshold (`scorelimit` remains an alias).
+- `/tdm map killstreaks <map> <true|false>` explicitly enables killstreaks on DEATHMATCH/FFA maps.
+- `/tdm map killscorereward <map> <amount>` sets spendable kill score awarded per valid kill.
+
+`/tdm help` is task-oriented and permission-aware. Player pages cover Match & Voting, Teams, Kits & Loadouts, and Maps. Operators additionally see administration pages, including `[Admin] /tdm teamless`, Kits, Utility & Killstreaks, and Map Configuration.

@@ -150,8 +150,7 @@ public class TDMHandler {
     public void onLogout(cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent event) {
         TDMManager.onPlayerDisconnected(event.player.worldObj, event.player);
         pendingRespawns.remove(getKey(event.player));
-        TDMManager.clearSurvivorChoice(event.player);
-        TDMManager.releaseRoundWaiting(event.player);
+        TDMManager.resetTDMTransientPlayerState(event.player);
         TDMSpectatorManager.forget(event.player);
     }
 
@@ -208,10 +207,11 @@ public class TDMHandler {
             TDMManager.Team attackerTeam = TDMManager.getOrAssignPlayerTeam(attacker);
             boolean valid=TDMManager.isCompetitivePlayer(victim)&&TDMManager.isCompetitivePlayer(attacker)&&(TDMManager.isFfaMode(victim.worldObj)||(attackerTeam!=null&&attackerTeam!=victimTeam));
             if (valid) {
-                if(!TDMManager.isFfaMode(victim.worldObj))TDMManager.addKillScore(victim.worldObj, attackerTeam);
                 TDMManager.recordKill(victim.worldObj, attacker.getCommandSenderName());
                 TDMManager.recordDeath(victim.worldObj, victim.getCommandSenderName());
                 TDMManager.awardKillBuyScore(attacker);
+                TDMManager.awardValidKillResources(attacker);
+                if(!TDMManager.isFfaMode(victim.worldObj))TDMManager.addTeamPointScore(victim.worldObj, attackerTeam);
             }
         }
         if (TDMManager.isBombMode(victim.worldObj)) {

@@ -16,6 +16,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.world.World;
@@ -57,11 +58,16 @@ public class TDMManager {
     private static String ffaRoundWinner;
     /** Names captured when the current non-BOMB competitive round starts. */
     private static final Set<String> activeRoundParticipants = new HashSet<String>();
+    /** Guards the authoritative non-BOMB round-end path against death/tick re-entry. */
+    private static boolean nonBombRoundEnding;
 
     public static void makePlayerTeamless(EntityPlayer player) {
         if (player == null) return;
         TDMData data = TDMData.get(player.worldObj);
         data.playerTeams.remove(getPlayerKey(player));
+        data.playerKillScores.remove(getPlayerKey(player));
+        data.playerPointScores.remove(getPlayerKey(player));
+        TDMPurchasableManager.clearPending(player);
         teamlessPlayers.add(getPlayerKey(player));
         cancelKitSelection(player);
         clearRoundPlayerState(player);
@@ -175,6 +181,9 @@ public class TDMManager {
         public int bombScoreLimitOverride;
         public int bombRoundTicksOverride;
         public boolean buyScoreEnabled = true;
+        /** Killstreak currency is opt-in and intended for respawn-based modes. */
+        public boolean killstreaksEnabled;
+        public int killScoreReward = 1;
         public int roundLossBuyScoreReward = 1;
         public int killBuyScoreReward = 2;
         public int roundWinBuyScoreReward = 3;
@@ -205,6 +214,23 @@ public class TDMManager {
     }
     public static boolean isBombMode(World world) { return getGameMode(world) == TDMGameMode.BOMB; }
     public static boolean isFfaMode(World world) { return getGameMode(world) == TDMGameMode.FFA; }
+
+    /** Returns the live TDM label consumed by Xenofactions' existing global-chat prefix pipeline. */
+    public static String getChatPrefix(EntityPlayer player) {
+        if (player == null || player.worldObj == null || !isEnabled(player.worldObj) || !isCompetitivePlayer(player)) return null;
+        if (isFfaMode(player.worldObj)) return EnumChatFormatting.GOLD + "[FFA]";
+        Team team = getPlayerTeam(player.worldObj, player.getCommandSenderName());
+        if (team == null) return null;
+        if (isBombMode(player.worldObj)) {
+            BombRole role = getBombRole(player.worldObj, team);
+            return role == BombRole.TERRORIST
+                    ? EnumChatFormatting.RED + "[T]"
+                    : EnumChatFormatting.BLUE + "[CT]";
+        }
+        return team == Team.BLUE
+                ? EnumChatFormatting.BLUE + "[BLUE]"
+                : EnumChatFormatting.RED + "[RED]";
+    }
 
     public static boolean configureMap(World world, String name, TDMGameMode mode, Team terrorists, Boolean hardcore) {
         TDMMap map=getMap(world,name); if(map==null)return false;
@@ -324,6 +350,7 @@ public class TDMManager {
         ffaEliminated.clear();
         deathmatchEliminated.clear();
         ffaNextRoundTick=0L; ffaRoundWinner=null; activeRoundParticipants.clear();
+        nonBombRoundEnding=false;
     }
 
     public static boolean isEnabled(World world) {
@@ -675,12 +702,8 @@ public class TDMManager {
         }
 
         int scoreLimit = getEffectiveScoreLimit(world);
-        if (now >= data.roundEndTick || data.redScore >= scoreLimit || data.blueScore >= scoreLimit) {
-            if (getGameMode(world) == TDMGameMode.DEATHMATCH) {
-                rotateAfterDeathmatch(world);
-            } else {
-                startMapVote(world);
-            }
+        if (now >= data.roundEndTick || data.redPointScore >= scoreLimit || data.bluePointScore >= scoreLimit) {
+            finishNonBombRound(world);
             return;
         }
 
@@ -708,11 +731,15 @@ public class TDMManager {
         clearAllModeEliminationState();
         for(EntityPlayerMP player:getOnlinePlayers())clearRoundPlayerState(player);
         TDMData data = TDMData.get(world);
-        data.redScore = 0;
-        data.blueScore = 0;
+        data.redPointScore = 0;
+        data.bluePointScore = 0;
         data.playerKills.clear();
         data.playerDeaths.clear();
         data.playerBuyScores.clear();
+        data.playerKillScores.clear();
+        data.playerPointScores.clear();
+        TDMPurchasableManager.clearAllPending();
+        nonBombRoundEnding = false;
         data.roundEndTick = world.getTotalWorldTime() + getEffectiveRoundTicks(world);
         data.mapVoteActive = false;
         data.mapVoteEndTick = 0;
@@ -734,7 +761,8 @@ public class TDMManager {
         sendStatusToAll(world);
     }
 
-    public static void addKillScore(World world, Team scoringTeam) {
+    /** Adds non-spendable DEATHMATCH point score; this is never killstreak currency. */
+    public static void addTeamPointScore(World world, Team scoringTeam) {
         TDMData data = TDMData.get(world);
         if (!data.enabled || data.mapVoteActive || scoringTeam == null) {
             return;
@@ -742,28 +770,55 @@ public class TDMManager {
 
         if (isBombMode(world)) { sendStatusToAll(world); return; }
         if (scoringTeam == Team.RED) {
-            data.redScore = addScore(data.redScore);
+            data.redPointScore = addPoint(data.redPointScore);
         } else if (scoringTeam == Team.BLUE) {
-            data.blueScore = addScore(data.blueScore);
+            data.bluePointScore = addPoint(data.bluePointScore);
         }
         data.markDirty();
 
         int scoreLimit = getEffectiveScoreLimit(world);
-        if (data.redScore >= scoreLimit || data.blueScore >= scoreLimit) {
-            if (hasAlternativeMap(data)) {
-                startMapVote(world);
-            } else {
-                // The death event records its final kill and death after this method returns.
-                // Let tickRound restart the match so startRound clears those final statistics too.
-                sendStatusToAll(world);
-            }
+        if (data.redPointScore >= scoreLimit || data.bluePointScore >= scoreLimit) {
+            finishNonBombRound(world);
         } else {
             sendStatusToAll(world);
         }
     }
 
-    private static int addScore(int score) {
+    private static int addPoint(int score) {
         return score > Integer.MAX_VALUE - POINTS_PER_KILL ? Integer.MAX_VALUE : score + POINTS_PER_KILL;
+    }
+
+    /** Awards both independent kill-derived resources after the death handler validates the kill. */
+    public static void awardValidKillResources(EntityPlayer attacker) {
+        if (attacker == null || !isCompetitivePlayer(attacker) || isBombMode(attacker.worldObj)) return;
+        TDMMap map = getSelectedMapData(attacker.worldObj);
+        if (map == null) return;
+        if (map.killstreaksEnabled && map.killScoreReward > 0) addPlayerKillScore(attacker, map.killScoreReward);
+        // Point score is last because reaching the threshold may synchronously end/reset the match.
+        if (map.mode == TDMGameMode.FFA) addPlayerPointScore(attacker, POINTS_PER_KILL);
+    }
+
+    public static int getPlayerPointScore(EntityPlayer player) { return player == null ? 0 : getPlayerPointScore(player.worldObj, getPlayerKey(player)); }
+    public static int getPlayerPointScore(World world, String playerName) { Integer value=TDMData.get(world).playerPointScores.get(playerName==null?"":playerName.toLowerCase());return value==null?0:Math.max(0,value.intValue()); }
+    public static int getPlayerKillScore(EntityPlayer player) { Integer value=player==null?null:TDMData.get(player.worldObj).playerKillScores.get(getPlayerKey(player));return value==null?0:Math.max(0,value.intValue()); }
+    private static void addPlayerPointScore(EntityPlayer player,int amount){if(amount<=0||nonBombRoundEnding)return;TDMData data=TDMData.get(player.worldObj);String key=getPlayerKey(player);int old=getPlayerPointScore(player);int next=old>Integer.MAX_VALUE-amount?Integer.MAX_VALUE:old+amount;data.playerPointScores.put(key,Integer.valueOf(next));data.markDirty();if(next>=getEffectiveScoreLimit(player.worldObj))finishNonBombRound(player.worldObj);else sendStatusToAll(player.worldObj);}
+    private static void addPlayerKillScore(EntityPlayer player,int amount){if(amount<=0)return;TDMData data=TDMData.get(player.worldObj);String key=getPlayerKey(player);int old=getPlayerKillScore(player);int next=old>Integer.MAX_VALUE-amount?Integer.MAX_VALUE:old+amount;data.playerKillScores.put(key,Integer.valueOf(next));data.markDirty();sendStatusToAll(player.worldObj);}
+    public static boolean spendPlayerKillScore(EntityPlayer player,int cost){if(player==null||cost<0)return false;TDMMap map=getSelectedMapData(player.worldObj);if(map==null||!map.killstreaksEnabled||(map.mode!=TDMGameMode.DEATHMATCH&&map.mode!=TDMGameMode.FFA))return false;TDMData data=TDMData.get(player.worldObj);int balance=getPlayerKillScore(player);if(balance<cost)return false;data.playerKillScores.put(getPlayerKey(player),Integer.valueOf(balance-cost));data.markDirty();sendStatusToAll(player.worldObj);return true;}
+
+    private static void finishNonBombRound(World world) {
+        if (nonBombRoundEnding || isBombMode(world) || !isEnabled(world)) return;
+        nonBombRoundEnding = true;
+        String result = getNonBombRoundResult(world);
+        for (EntityPlayerMP player : getOnlinePlayers()) if (player.worldObj == world) player.addChatMessage(new ChatComponentText(result));
+        sendStatusToAll(world);
+        if (hasAlternativeMap(TDMData.get(world))) startMapVote(world); else startRound(world, true);
+    }
+
+    private static String getNonBombRoundResult(World world) {
+        TDMData data=TDMData.get(world);
+        if(getGameMode(world)==TDMGameMode.DEATHMATCH){if(data.redPointScore==data.bluePointScore)return "Deathmatch ended in a draw at "+data.redPointScore+" points.";Team winner=data.redPointScore>data.bluePointScore?Team.RED:Team.BLUE;return winner.name.toUpperCase()+" wins Deathmatch "+Math.max(data.redPointScore,data.bluePointScore)+" to "+Math.min(data.redPointScore,data.bluePointScore)+".";}
+        String winner=null;int best=-1;boolean tied=false;for(Map.Entry<String,Integer> entry:data.playerPointScores.entrySet()){int points=Math.max(0,entry.getValue().intValue());if(points>best){winner=entry.getKey();best=points;tied=false;}else if(points==best){tied=true;}}
+        return winner==null||tied?"FFA ended in a draw at "+Math.max(0,best)+" points.":winner+" wins FFA with "+best+" points.";
     }
 
     /** Handles automatic DEATHMATCH rotation without changing manual skip-vote behavior. */
@@ -848,7 +903,7 @@ public class TDMManager {
 
     public static int getScore(World world, Team team) {
         TDMData data = TDMData.get(world);
-        return team == Team.RED ? data.redScore : data.blueScore;
+        return team == Team.RED ? data.redPointScore : data.bluePointScore;
     }
 
     public static void sendStatusToAll(World world) {
@@ -859,8 +914,8 @@ public class TDMManager {
                         data.mapVoteActive,
                         getRemainingRoundSeconds(world),
                         getRemainingVoteSeconds(world),
-                        data.redScore,
-                        data.blueScore, data.selectedMap,
+                        data.redPointScore,
+                        data.bluePointScore, data.selectedMap,
                         getGameMode(world).name(), TDMBombManager.getState().name(),
                         data.redBombWins, data.blueBombWins, getTerroristTeam(world).name,
                         TDMBombManager.getRemainingSeconds(world), TDMBombManager.getPlantedSite(),
@@ -901,23 +956,27 @@ public class TDMManager {
             data.skipVoteInitiator = player.getCommandSenderName();
             data.skipVotes.clear();
             broadcastTDM(world, player.getCommandSenderName() + " started a vote to skip the current map.");
+            broadcastTDM(world, "Vote with /tdm skip yes or /tdm skip no.");
+            broadcastTDM(world, "Votes needed to pass: " + requiredSkipVotes(countEligibleSkipVoters(data)) + ".");
         }
         if (data.skipVotes.containsKey(key)) return "You have already voted in this skip vote.";
         data.skipVotes.put(key, Boolean.valueOf(yes));
         data.markDirty();
-        String status = getSkipVoteStatus(world);
-        broadcastTDM(world, player.getCommandSenderName() + " voted " + (yes ? "yes" : "no") + ". " + status);
+        int required = requiredSkipVotes(countEligibleSkipVoters(data));
+        int yesVotes = countSkipYesVotes(data);
+        broadcastTDM(world, player.getCommandSenderName() + " voted " + (yes ? "YES" : "NO")
+                + ". [" + yesVotes + "/" + required + " YES votes required]");
         evaluateSkipVote(world);
-        return status;
+        return null;
     }
 
     public static String getSkipVoteStatus(World world) {
         TDMData data = TDMData.get(world);
         if (!data.skipVoteActive) return "No skip-map vote is active.";
         int eligible = countEligibleSkipVoters(data);
-        int yes = 0, no = 0;
-        for (Boolean vote : data.skipVotes.values()) if (vote.booleanValue()) yes++; else no++;
-        return "Skip vote by " + data.skipVoteInitiator + ": yes " + yes + ", no " + no + ", " + requiredSkipVotes(eligible) + " yes required.";
+        int yes = countSkipYesVotes(data);
+        return "The vote to skip the current map has " + yes + " YES " + (yes == 1 ? "vote" : "votes")
+                + "; " + requiredSkipVotes(eligible) + " YES votes are required to pass.";
     }
 
     public static void onPlayerDisconnected(World world, EntityPlayer player) {
@@ -930,7 +989,7 @@ public class TDMManager {
     private static void tickSkipVote(World world) {
         TDMData data = TDMData.get(world);
         if (world.getTotalWorldTime() >= data.skipVoteEndTick) {
-            broadcastTDM(world, "The vote to skip the current map failed (expired). " + getSkipVoteStatus(world));
+            broadcastTDM(world, "The vote to skip the current map expired.");
             clearSkipVote(data);
             data.markDirty();
             return;
@@ -947,12 +1006,12 @@ public class TDMManager {
         int required = requiredSkipVotes(eligible.size()), yes = 0;
         for (Boolean vote : data.skipVotes.values()) if (vote.booleanValue()) yes++;
         if (yes >= required && required > 0) {
-            broadcastTDM(world, "The vote to skip the current map passed (" + yes + "/" + required + ").");
+            broadcastTDM(world, "The vote passed. Skipping the current map...");
             clearSkipVote(data);
             data.markDirty();
             startMapVote(world); // Owns objective, combat, freeze, kit, buy-phase, and transition cleanup; awards no result.
         } else if (yes + (eligible.size() - data.skipVotes.size()) < required) {
-            broadcastTDM(world, "The vote to skip the current map failed. " + getSkipVoteStatus(world));
+            broadcastTDM(world, "The vote to skip the current map failed.");
             clearSkipVote(data);
             data.markDirty();
         }
@@ -969,6 +1028,12 @@ public class TDMManager {
     }
 
     private static int requiredSkipVotes(int eligible) { return eligible / 2 + 1; }
+
+    private static int countSkipYesVotes(TDMData data) {
+        int yes = 0;
+        for (Boolean vote : data.skipVotes.values()) if (vote.booleanValue()) yes++;
+        return yes;
+    }
 
     private static void clearSkipVote(TDMData data) {
         data.skipVoteActive = false; data.skipVoteEndTick = 0; data.skipVoteInitiator = ""; data.skipVotes.clear();
@@ -1276,6 +1341,7 @@ public class TDMManager {
     }
 
     public static int getBuyScore(EntityPlayer player){Integer v=TDMData.get(player.worldObj).playerBuyScores.get(getPlayerKey(player));return v==null?0:Math.max(0,v.intValue());}
+    public static boolean spendBuyScore(EntityPlayer player,int amount){if(player==null||amount<0)return false;TDMMap map=getSelectedMapData(player.worldObj);if(map==null||map.mode!=TDMGameMode.BOMB||!map.buyScoreEnabled||!isGlobalBombBuyPeriod(player))return false;int balance=getBuyScore(player);if(balance<amount)return false;TDMData data=TDMData.get(player.worldObj);data.playerBuyScores.put(getPlayerKey(player),Integer.valueOf(balance-amount));data.markDirty();sendStatusToAll(player.worldObj);return true;}
     public static void addBuyScore(EntityPlayer player,int amount){TDMMap map=getSelectedMapData(player.worldObj);if(map==null||map.mode!=TDMGameMode.BOMB||!map.buyScoreEnabled||amount<=0)return;TDMData d=TDMData.get(player.worldObj);int old=getBuyScore(player);int next=old>Integer.MAX_VALUE-amount?Integer.MAX_VALUE:old+amount;d.playerBuyScores.put(getPlayerKey(player),Integer.valueOf(next));d.markDirty();sendStatusToAll(player.worldObj);}
     public static void awardKillBuyScore(EntityPlayer player){TDMMap map=getSelectedMapData(player.worldObj);if(map!=null&&map.mode==TDMGameMode.BOMB&&map.buyScoreEnabled&&isCompetitivePlayer(player)&&TDMBombManager.isRoundActive())addBuyScore(player,map.killBuyScoreReward);}
     public static void awardRoundWinBuyScore(World world,Team team,EntityPlayer individual){TDMMap map=getSelectedMapData(world);if(map==null)return;if(individual!=null){if(isCompetitivePlayer(individual))addBuyScore(individual,map.roundWinBuyScoreReward);return;}for(EntityPlayerMP p:getOnlinePlayers())if(p.worldObj==world&&isCompetitivePlayer(p)&&getPlayerTeam(world,p.getCommandSenderName())==team)addBuyScore(p,map.roundWinBuyScoreReward);}
@@ -1473,7 +1539,8 @@ public class TDMManager {
                 || TDMSpectatorManager.isObserving(player)) return false;
         TDMMap map = getSelectedMapData(player.worldObj);
         if (map == null) return false;
-        for (SpawnPoint spawn : map.spawns) if (spawn.dim == player.dimension) return true;
+        List<SpawnPoint> source = map.spawns.isEmpty() ? TDMData.get(player.worldObj).spawns : map.spawns;
+        for (SpawnPoint spawn : source) if (spawn.dim == player.dimension) return true;
         return false;
     }
 
@@ -1486,11 +1553,13 @@ public class TDMManager {
         String key = getPlayerKey(player);
         respawnLockProtectionActive.remove(key);
         buyProtectionActive.add(key);
-        freezeAnchors.put(key, new FreezeAnchor(player));
+        if (!freezeAnchors.containsKey(key)) {
+            freezeAnchors.put(key, new FreezeAnchor(player));
+            if (XFConfig.tdmBombLifecycleDebug && MainRegistry.logger != null)
+                MainRegistry.logger.info("TDM BUY: {} freeze anchor=({}, {}, {})", player.getCommandSenderName(), player.posX, player.posY, player.posZ);
+        }
         applyOwnedProtectionEffects(player);
         enforceFreeze(player, freezeAnchors.get(key));
-        if (XFConfig.tdmBombLifecycleDebug && MainRegistry.logger != null)
-            MainRegistry.logger.info("TDM BUY: {} freeze anchor=({}, {}, {})", player.getCommandSenderName(), player.posX, player.posY, player.posZ);
     }
 
     /** Per-player RESPawn lock protection; global buy protection has separate ownership. */
@@ -1554,6 +1623,7 @@ public class TDMManager {
     /** Clears only transient state owned by TDM; spectator flags and kit potions remain independent. */
     public static void resetTDMTransientPlayerState(EntityPlayer player) {
         cancelKitSelection(player);
+        TDMPurchasableManager.clearPending(player);
         releaseRoundWaiting(player);
         survivorChoicePending.remove(getPlayerKey(player));
         TDMSpectatorManager.restore(player);
@@ -1775,6 +1845,7 @@ public class TDMManager {
         if (!TDMKitManager.applyKit(mapName, pool, kitIndex, player)) {
             return KitSelectionResult.INVALID_SELECTION;
         }
+        TDMPurchasableManager.applyPendingKillstreakRewards(player);
         // Survivor-kit state belongs exclusively to competitive BOMB purchases.
         if (context != KitSelectionContext.LOADOUT_SELECTION && isBombMode(player.worldObj)) {
             selectedKits.put(playerKey, new SelectedKit(pool, kitIndex));
@@ -1816,7 +1887,7 @@ public class TDMManager {
         return KitSelectionResult.BUY_PHASE_ENDED;
     }
 
-    private static String getPlayerKey(EntityPlayer player) {
+    public static String getPlayerKey(EntityPlayer player) {
         return player.getCommandSenderName().toLowerCase();
     }
 

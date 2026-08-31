@@ -717,3 +717,23 @@ Added `/c stonedrops [page]` as a read-only player-accessible command for viewin
 - Introduced an explicit economy-free Deathmatch/FFA loadout-selection lifecycle separate from competitive BOMB buy and survivor-kit state; the shared kit GUI now labels respawn loadouts without displaying prices.
 - Made Deathmatch and FFA login/respawn paths enter continuous gameplay immediately rather than inheriting competitive round-waiting/elimination policy, while retaining active hardcore BOMB late-join waiting.
 - Restricted buy-score awards, economy configuration, and hardcore round-elimination configuration to BOMB maps, and retained mode-transition cleanup of incompatible transient state. Source/call-site inspection and static checks were completed; multiplayer runtime validation remains required.
+
+2026-08-31 00:00 — Restore competitive BOMB initialization and skip-vote feedback
+
+- Routed a persisted enabled BOMB server through full match initialization before its first round so first-round buy score is zero while later authoritative economy rewards remain unchanged.
+- Kept each hardcore BOMB buy-time freeze anchor stable across enforcement ticks instead of replacing it with the player's already-moved position, retained map-specific and legacy spawn support without touching the separate Deathmatch/FFA loadout path, and explicitly clears TDM-owned freeze and protection state on logout.
+- Replaced implementation-oriented skip-vote tallies with player-facing start instructions, YES progress, pass, failure, and expiry announcements.
+- Source-level lifecycle and call-site inspection was completed; multiplayer and dedicated-server runtime validation remains required.
+
+2026-08-31 00:00 — Isolate TDM score domains and configurable purchases
+
+- Split DEATHMATCH team point score and FFA player point score from persisted kill statistics, BOMB buy score, and the new per-player spendable kill score; valid-kill awarding and match resets now mutate each domain explicitly.
+- Added immediate point-threshold and timer round completion through a guarded non-BOMB round-end path, plus the `pointlimit` map-setting name while retaining `scorelimit` compatibility.
+- Added persisted, inventory-defined Utility and Killstreak purchases with server-authoritative mode, buy-time, selection-context, and balance validation. Utility consumes only BOMB buy score; queued killstreak rewards consume only kill score and are applied after respawn kit reconstruction.
+- Added opt-in per-map killstreak support/reward settings, mode-aware menu buttons and kill-score display, administration commands, player list/buy commands, permission-aware completion, and task-oriented help/documentation. Source inspection and static consistency checks were completed; dedicated-server and multiplayer runtime validation remains required.
+
+2026-08-31 00:00 — Integrate TDM chat identity and faction membership restrictions
+
+- Routed live Blue, Red, Terrorist, Counter-Terrorist, and FFA labels through the existing Xenofactions global-chat prefix formatter; teamless and observer players retain neutral/faction behavior, and disabling TDM immediately restores faction prefixes without persisted chat state.
+- Added a shared TDM membership guard at the authoritative faction creation/member-add operations and their create, apply, accept, and administrative force-join entry paths, with clear command and help feedback while leaving existing memberships untouched.
+- Source-level call-site and lifecycle inspection was completed; dedicated-server chat, team/map/mode transition, and faction-command runtime validation remains required.

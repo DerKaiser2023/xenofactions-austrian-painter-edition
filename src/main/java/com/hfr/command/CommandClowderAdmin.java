@@ -73,6 +73,7 @@ public class CommandClowderAdmin extends CommandBase {
 		if(cmd.equals("factiontimeoutcreationreset")) { FactionCreationTimeoutResetHandler.execute(sender, Arrays.copyOfRange(args, 1, args.length)); return; }
 		if(cmd.equals("earth")) { EarthCommandHandler.execute(sender, Arrays.copyOfRange(args, 1, args.length)); return; }
 		if(cmd.equals("worldborder")) { WorldBorderCommandHandler.execute(sender, Arrays.copyOfRange(args, 1, args.length)); return; }
+		if(cmd.equals("research") || cmd.equals("tech") || cmd.equals("technology")) { ResearchCommandHandler.execute(sender, Arrays.copyOfRange(args, 1, args.length)); return; }
 		if(cmd.equals("help") || cmd.equals("man")) { cmdHelp(sender, args.length > 1 ? args[1] : "1"); return; }
 		if(cmd.equals("clearcreationcooldown") || cmd.equals("resetcreationcooldown")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdClearCreationCooldown(sender, args[1]); return; }
 		if(cmd.equals("forcejoin") || cmd.equals("fj")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdForcejoin(sender, joinArgs(args, 1)); return; }
@@ -620,6 +621,10 @@ public class CommandClowderAdmin extends CommandBase {
 			return getListOfStringsMatchingLastWord(args, new String[] { "on", "off", "status", "wand", "exempt", "clearexemptions" });
 		if(cmd.equals("earth") && args.length == 3 && args[1].equalsIgnoreCase("verify"))
 			return getListOfStringsMatchingLastWord(args, EarthCommandHandler.getPackIds());
+		if(cmd.equals("research") || cmd.equals("tech") || cmd.equals("technology")) {
+			List<String> subs = ResearchCommandHandler.getSubCommandCompletions(Arrays.copyOfRange(args, 1, args.length));
+			return getListOfStringsMatchingLastWord(args, subs.toArray(new String[0]));
+		}
 		if(cmd.equals("forcekick") || cmd.equals("fk") || cmd.equals("factiontimeoutcreationreset") || cmd.equals("clearcreationcooldown") || cmd.equals("resetcreationcooldown"))
 			return getListOfStringsMatchingLastWord(args, MinecraftServer.getServer().getAllUsernames());
 
@@ -630,7 +635,7 @@ public class CommandClowderAdmin extends CommandBase {
     }
 
 	private String[] getAdminCommandNames() {
-		return new String[] { "help", "factiontimeoutcreationreset", "earth", "worldborder", "clearcreationcooldown", "resetcreationcooldown", "forcejoin", "fj", "forcekick", "fk", "forcedisband", "fd", "forcerename", "fr",
+		return new String[] { "help", "factiontimeoutcreationreset", "earth", "worldborder", "research", "tech", "technology", "clearcreationcooldown", "resetcreationcooldown", "forcejoin", "fj", "forcekick", "fk", "forcedisband", "fd", "forcerename", "fr",
 				"hijack", "hi", "deletedata", "deldat", "setclaim", "sc", "addprestige", "ap", "disband", "rename",
 				"warenable", "wardisable", "newplayerprotection", "resetnewplayerprotection", "endnewplayerprotection",
 				"skipwarcooldowns", "ignorewarcooldowncheck", "ignorewaronlinecheck", "ignorewarstatecheck",

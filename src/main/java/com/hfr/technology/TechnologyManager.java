@@ -12,25 +12,40 @@ import com.hfr.clowder.Clowder;
 public class TechnologyManager {
     public static TechnologyConfig config = new TechnologyConfig();
     public static TechnologyTree tree;
+    public static boolean treeAvailable = false;
     public static boolean initialized = false;
 
     public static void init(Configuration config) {
         if (initialized) return;
         TechnologyManager.config.load(config);
-        if (!TechnologyManager.config.enabled) {
-            initialized = true;
-            return;
-        }
         tree = TechnologyLoader.load(config);
-        if (tree == null) {
-            XFLog.warn("[Technology] Technology system enabled but no tree loaded. Disabling system.");
-            TechnologyManager.config.enabled = false;
+        treeAvailable = tree != null;
+        if (TechnologyManager.config.enabled && !treeAvailable) {
+            XFLog.warn("[Technology] Technology system enabled but no tree loaded. Block/Item registrations and /xc research gui will still work; gameplay hooks will no-op until a tree is loaded (drop technology_tree.json under config/research/ and run /xc research reload).");
         }
         initialized = true;
     }
 
+    /** Currency identifier declared at the root of technology_tree.json. */
+    public static String getResearchCurrency() {
+        return tree == null ? "research_points" : tree.researchCurrency;
+    }
+
+    /** Currency identifier configured in hfr.cfg for technology licenses. */
+    public static String getPurchaseCurrency() {
+        return config.currencyPurchase;
+    }
+
     public static boolean isEnabled() {
         return initialized && config.enabled && tree != null;
+    }
+
+    public static boolean isConfigEnabled() {
+        return initialized && config.enabled;
+    }
+
+    public static boolean isTreeAvailable() {
+        return treeAvailable;
     }
 
     public static Technology getTechnology(String id) {

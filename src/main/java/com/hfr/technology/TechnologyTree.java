@@ -7,11 +7,14 @@ import java.util.Map;
 
 public class TechnologyTree {
     public final List<Technology> technologies;
+    /** Currency name declared by the loaded technology-tree JSON. */
+    public final String researchCurrency;
     public final Map<String, Technology> byId;
     public final Map<String, String> itemToTech;
     public final Map<String, String> recipeToTech;
 
-    public TechnologyTree(List<Technology> technologies) {
+    public TechnologyTree(List<Technology> technologies, String researchCurrency) {
+        this.researchCurrency = researchCurrency == null || researchCurrency.trim().isEmpty() ? "research_points" : researchCurrency;
         this.technologies = technologies;
         this.byId = new HashMap<String, Technology>();
         this.itemToTech = new HashMap<String, String>();

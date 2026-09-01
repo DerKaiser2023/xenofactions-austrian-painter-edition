@@ -60,4 +60,9 @@ public class FactionTechnologyData {
     public void setPurchased(String id, boolean value) {
         if (value) purchased.add(id); else purchased.remove(id);
     }
+
+    public void clearAll() {
+        researched.clear();
+        purchased.clear();
+    }
 }

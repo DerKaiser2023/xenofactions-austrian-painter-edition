@@ -4,7 +4,7 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
+import cpw.mods.fml.common.gameevent.PlayerEvent;
 import com.hfr.main.MainRegistry;
 
 public class TechnologyCraftingHandler {

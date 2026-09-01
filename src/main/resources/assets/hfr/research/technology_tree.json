@@ -1,0 +1,59 @@
+{
+  "currency": {
+    "research": "research_points"
+  },
+  "technologies": [
+    {
+      "id": "tech.basics",
+      "name": "Basics",
+      "tier": 0.0,
+      "type": "free",
+      "research_cost": 0,
+      "purchase_cost": 0,
+      "prerequisites": [],
+      "items": [],
+      "recipes": []
+    },
+    {
+      "id": "tech.ironworking",
+      "name": "Ironworking",
+      "tier": 0.5,
+      "type": "research_required",
+      "research_cost": 250,
+      "purchase_cost": 500,
+      "prerequisites": ["tech.basics"],
+      "items": [
+        "minecraft:iron_ingot",
+        { "id": "minecraft:iron_pickaxe", "crafting": true, "usage": true }
+      ],
+      "recipes": []
+    },
+    {
+      "id": "tech.early_industry",
+      "name": "Early Industry",
+      "tier": 1.0,
+      "type": "research_required",
+      "research_cost": 500,
+      "purchase_cost": 1000,
+      "prerequisites": ["tech.ironworking"],
+      "items": [
+        "minecraft:furnace",
+        "minecraft:coal"
+      ],
+      "recipes": []
+    },
+    {
+      "id": "tech.advanced_metallurgy",
+      "name": "Advanced Metallurgy",
+      "tier": 1.5,
+      "type": "unlockable",
+      "research_cost": 0,
+      "purchase_cost": 1500,
+      "prerequisites": ["tech.early_industry"],
+      "items": [
+        "minecraft:diamond"
+      ],
+      "recipes": []
+    }
+  ]
+}

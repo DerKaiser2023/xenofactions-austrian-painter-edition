@@ -433,7 +433,9 @@ public class MainRegistry
 			logger = PreEvent.getModLog();
 
 		loadConfig(PreEvent);
+		com.hfr.technology.TechnologyLoader.ensureStarterFiles(config);
 		com.hfr.technology.TechnologyManager.init(config);
+		config.save(); // Persist the technology section in the HFR configuration file on first start.
 		ModBlocks.mainRegistry();
 		ModItems.mainRegistry();
 		SchematicLibrary.get().initialize(PreEvent.getModConfigurationDirectory());
@@ -441,7 +443,7 @@ public class MainRegistry
 		MinecraftForge.EVENT_BUS.register(new com.hfr.world.earth.XFEarthWorldValidationHandler());
 		CraftingManager.mainRegistry();
 		if(com.hfr.technology.TechnologyManager.isEnabled())
-			GameRegistry.registerItem(new com.hfr.technology.ResearchBook(), "research_book");
+			GameRegistry.registerItem(new com.hfr.technology.ResearchBook().setCreativeTab(tab), "research_book");
 		proxy.registerRenderInfo();
 		FluidHandler.init();
 		HFRPotion.init();

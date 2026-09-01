@@ -940,3 +940,13 @@ gui.builder.distance.warning=Warning: schematic origin is extremely far from the
 gui.builder.preview.moved=Preview moved.
 
 item.world_border_wand.name=World Border Exemption Wand
+tile.research_block.name=Research Block
+tile.purchase_block.name=Purchase Block
+item.research_book.name=Research Book
+gui.hfr.technology.title=Technology Tree
+gui.hfr.technology.disabled.1=Technology system is disabled.
+gui.hfr.technology.disabled.2=Enable hfr_enabled in hfr.cfg to use it.
+gui.hfr.technology.disabled.3=Use /xc research status to view commands.
+gui.hfr.technology.notree.1=No technology tree loaded.
+gui.hfr.technology.notree.2=Drop technology_tree.json into config/research/.
+gui.hfr.technology.notree.3=Then run /xc research reload.

@@ -11,14 +11,52 @@ import net.minecraftforge.common.config.Configuration;
 public class TechnologyLoader {
 
     private static final Gson GSON = new Gson();
-    private static final String DEFAULT_PATH = "config/techtree/technology_tree.json";
+    private static final String DEFAULT_PATH = "config/research/technology_tree.json";
+    private static final String STARTER_TREE = "{\n  \"currency\": { \"research\": \"research_points\" },\n  \"technologies\": []\n}\n";
+    private static final String README = "# HFR Research Technology Tree\n\nThis folder is created automatically. `technology_tree.json` is only loaded when the HFR research system is enabled in hfr.cfg.\n\n## Currency\n\nSet research currency in the tree root: `\"currency\": { \"research\": \"research_points\" }`. Set license purchase currency in hfr.cfg with `hfr_currency_purchase`.\n\n## Technologies\n\nAdd entries to the `technologies` array. Each needs a permanent `id`, display `name`, `tier`, `type` (`free`, `unlockable`, or `research_required`), `prerequisites`, costs, items, and recipes. Item IDs use `modid:item`; metadata variants may use `modid:item:metadata`.\n";
+
+    /** Creates editable starter files without parsing or enabling the technology tree. */
+    public static void ensureStarterFiles(Configuration config) {
+        File directory = ensureDirectory(config);
+        String configuredName = config != null ? TechnologyManager.config.technologyTreePath : "technology_tree.json";
+        writeIfMissing(new File(directory, "README.md"), README);
+        writeIfMissing(new File(directory, configuredName), STARTER_TREE);
+    }
+
+    private static void writeIfMissing(File file, String contents) {
+        if (file.exists()) return;
+        Writer writer = null;
+        try {
+            writer = new OutputStreamWriter(new FileOutputStream(file), "UTF-8");
+            writer.write(contents);
+            XFLog.info("[Technology] Created starter file at " + file.getAbsolutePath());
+        } catch (IOException e) {
+            XFLog.warn("[Technology] Could not create starter file at " + file.getAbsolutePath() + ": " + e.getMessage());
+        } finally {
+            if (writer != null) try { writer.close(); } catch (IOException ignored) { }
+        }
+    }
+
+    /** Returns the folder containing technology tree JSON files, creating it if necessary. */
+    public static File ensureDirectory(Configuration config) {
+        File directory = config != null ? new File(config.getConfigFile().getParentFile(), "research") : new File("config/research");
+        if (!directory.exists()) {
+            if (directory.mkdirs()) {
+                XFLog.info("[Technology] Created research directory at " + directory.getAbsolutePath());
+            } else {
+                XFLog.warn("[Technology] Could not create research directory at " + directory.getAbsolutePath());
+            }
+        }
+        return directory;
+    }
 
     public static TechnologyTree load(Configuration config) {
-        String path = config != null ? config.get("technology_system", "technology_tree", DEFAULT_PATH,
-                "Path to the technology tree JSON relative to the config directory.").getString() : DEFAULT_PATH;
-        File file = new File(path);
+        String configuredName = config != null ? TechnologyManager.config.technologyTreePath : "technology_tree.json";
+        File directory = ensureDirectory(config);
+        File file = new File(directory, configuredName);
+        String path = file.getPath();
         if (!file.exists()) {
-            XFLog.warn("[Technology] Technology tree not found at " + path + " - system disabled.");
+            XFLog.warn("[Technology] Technology tree not found at " + path + " - place a JSON there and run /xc research reload.");
             return null;
         }
         try {
@@ -38,7 +76,10 @@ public class TechnologyLoader {
                     XFLog.warn("[Technology] Failed to parse technology entry: " + e.getMessage());
                 }
             }
-            return new TechnologyTree(techs);
+            String researchCurrency = "research_points";
+            if (root.has("currency") && root.get("currency").isJsonObject() && root.getAsJsonObject("currency").has("research"))
+                researchCurrency = root.getAsJsonObject("currency").get("research").getAsString();
+            return new TechnologyTree(techs, researchCurrency);
         } catch (Exception e) {
             XFLog.warn("[Technology] Failed to load technology tree from " + path + ": " + e.getMessage());
             return null;
@@ -52,7 +93,7 @@ public class TechnologyLoader {
         TechnologyType type = TechnologyType.FREE;
         if (obj.has("type")) {
             try {
-                type = TechnologyType.valueOf(obj.get("type").getAsString().toUpperCase().replace(-, _));
+                type = TechnologyType.valueOf(obj.get("type").getAsString().toUpperCase().replace('-', '_'));
             } catch (IllegalArgumentException e) {
                 XFLog.warn("[Technology] Unknown type '" + obj.get("type").getAsString() + "' for " + id + ", defaulting to FREE");
             }

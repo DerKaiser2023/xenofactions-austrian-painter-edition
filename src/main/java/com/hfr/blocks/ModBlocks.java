@@ -153,8 +153,8 @@ public class ModBlocks {
 
 	public static Block research_block;
 	public static Block purchase_block;
-	public static final int guiID_research = 100;
-	public static final int guiID_purchase = 101;
+	public static final int guiID_research = 102;
+	public static final int guiID_purchase = 103;
 
 	public static Block barricade;
 
@@ -294,8 +294,8 @@ public class ModBlocks {
 		machine_foundry = new MachineFoundry(Material.iron).setStepSound(soundTypeConcrete).setBlockName("machine_foundry").setHardness(5.0F).setResistance(0.0F).setCreativeTab(MainRegistry.tab).setBlockTextureName(RefStrings.MODID + ":machine_foundry");
 
 		if(com.hfr.technology.TechnologyManager.isEnabled()) {
-			research_block = new com.hfr.technology.ResearchBlock();
-			purchase_block = new com.hfr.technology.PurchaseBlock();
+			research_block = new com.hfr.technology.ResearchBlock().setCreativeTab(MainRegistry.tab);
+			purchase_block = new com.hfr.technology.PurchaseBlock().setCreativeTab(MainRegistry.tab);
 		}
 
 		

@@ -1,6 +1,4 @@
-whatever any of you do DO NOT BUILD. i havent finished some stuff so im 99% sure it will brick
-
-this is a warning i swear
+notice to anyone who builds this: this isnt complete but doesnt brick so you can safely build without a crash
 
 # Xenofactions
 

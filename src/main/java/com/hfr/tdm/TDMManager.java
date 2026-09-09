@@ -224,8 +224,8 @@ public class TDMManager {
         if (isBombMode(player.worldObj)) {
             BombRole role = getBombRole(player.worldObj, team);
             return role == BombRole.TERRORIST
-                    ? EnumChatFormatting.RED + "[T]"
-                    : EnumChatFormatting.BLUE + "[CT]";
+                    ? EnumChatFormatting.RED + "[Terrorist]"
+                    : EnumChatFormatting.BLUE + "[Counter-Terrorist]";
         }
         return team == Team.BLUE
                 ? EnumChatFormatting.BLUE + "[BLUE]"

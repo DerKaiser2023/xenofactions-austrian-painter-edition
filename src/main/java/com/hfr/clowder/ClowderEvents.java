@@ -372,13 +372,13 @@ public void handleChatServer(ServerChatEvent event) {
 					return;
 				}
 				
-				if(!player.inventory.hasItem(ModItems.debug) && (owner == null || owner.zone == Zone.WILDERNESS) && (b == Blocks.chest || b == Blocks.trapped_chest)) {
+if(!player.inventory.hasItem(ModItems.debug) && MainRegistry.disableChests && (owner == null || owner.zone == Zone.WILDERNESS) && (b == Blocks.chest || b == Blocks.trapped_chest)) {
 
-					player.addChatMessage(new ChatComponentText(CommandClowder.ERROR + "Chests are disabled outside of claims."));
-					player.addChatMessage(new ChatComponentText(CommandClowder.ERROR + "For temporary storage, use cardboard boxes (crafable with chests)"));
-					event.setCanceled(true);
-					return;
-				}
+				player.addChatMessage(new ChatComponentText(CommandClowder.ERROR + "Chests are disabled outside of claims."));
+				player.addChatMessage(new ChatComponentText(CommandClowder.ERROR + "For temporary storage, use cardboard boxes (crafable with chests)"));
+				event.setCanceled(true);
+				return;
+			}
 			}
 		}
 	}

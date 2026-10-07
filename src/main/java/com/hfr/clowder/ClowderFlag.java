@@ -20,7 +20,7 @@ public enum ClowderFlag {
 	USSR("ussr"),
 	ASTERISK("asterisk"),
 	PONYCUM("pc", false),
-	SPACEFLAG("spaceflag", true, true, false);
+	SPACEFLAG("spaceflag", true, true, true);
 
 	public String name = "";
 	public boolean show = true;

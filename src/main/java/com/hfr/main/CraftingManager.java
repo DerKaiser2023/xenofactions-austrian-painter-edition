@@ -50,8 +50,7 @@ public class CraftingManager {
 		GameRegistry.addRecipe(new ItemStack(ModItems.rice, 9), new Object[] { "#", '#', ModItems.rice_bag });
 		GameRegistry.addRecipe(new ItemStack(Items.paper, 3), new Object[] { "##", '#', ModItems.part_sawdust });
 
-		GameRegistry.addShapelessRecipe(new ItemStack(ModBlocks.barricade, 4), new Object[] { Blocks.sand, ModItems.part_rubber });
-		GameRegistry.addShapelessRecipe(new ItemStack(ModBlocks.barricade, 6), new Object[] { Blocks.sand, ModItems.part_rubber, ModItems.part_sawdust });
+		GameRegistry.addShapelessRecipe(new ItemStack(ModBlocks.barricade, 1), new Object[] { Blocks.sand });
 
 		//GameRegistry.addRecipe(new ItemStack(ModItems.graphene_vest, 1), new Object[] { "# #", "###", "###", '#', ModItems.ingot_graphene });
 

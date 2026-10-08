@@ -13,6 +13,7 @@ import com.hfr.clowder.ClowderTerritory;
 import com.hfr.clowder.ClowderTerritory.CoordPair;
 import com.hfr.clowder.ClowderTerritory.TerritoryMeta;
 import com.hfr.clowder.ClowderTerritory.Zone;
+import com.hfr.clowder.TerritoryCoordinateBounds;
 import com.hfr.main.MainRegistry;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -189,8 +190,10 @@ public class XFDynmapIntegration {
 			String cityId = safeCityId(meta);
 			String markerId = "xf_claim_" + coords.dimensionId + "_" + coords.x + "_" + coords.z;
 			String label = buildClaimLabel(meta, owner, coords);
-			double[] x = new double[] { coords.x * 16.0D, coords.x * 16.0D + 16.0D };
-			double[] z = new double[] { coords.z * 16.0D, coords.z * 16.0D + 16.0D };
+			TerritoryCoordinateBounds.Bounds b = TerritoryCoordinateBounds.forCoordinate(coords.x);
+			TerritoryCoordinateBounds.Bounds bz = TerritoryCoordinateBounds.forCoordinate(coords.z);
+			double[] x = new double[] { (double)b.minInclusive, (double)b.maxExclusive };
+			double[] z = new double[] { (double)bz.minInclusive, (double)bz.maxExclusive };
 
 			Object area = createAreaMarkerMethod.invoke(markerSet, markerId, label, Boolean.TRUE, worldName, x, z, Boolean.FALSE);
 			if(area != null) {
@@ -233,14 +236,18 @@ public class XFDynmapIntegration {
 			String[] parts = claim.split(",", 2);
 			int chunkX = Integer.parseInt(parts[0]);
 			int chunkZ = Integer.parseInt(parts[1]);
+			TerritoryCoordinateBounds.Bounds bx = TerritoryCoordinateBounds.forCoordinate(chunkX);
+			TerritoryCoordinateBounds.Bounds bz = TerritoryCoordinateBounds.forCoordinate(chunkZ);
+			double x0 = (double)bx.minInclusive, x1 = (double)bx.maxExclusive;
+			double z0 = (double)bz.minInclusive, z1 = (double)bz.maxExclusive;
 			if(!city.claims.contains(chunkKey(chunkX, chunkZ - 1)))
-				createBorderEdge(worldName, city, edge++, chunkX * 16.0D, chunkZ * 16.0D, chunkX * 16.0D + 16.0D, chunkZ * 16.0D);
+				createBorderEdge(worldName, city, edge++, x0, z0, x1, z0);
 			if(!city.claims.contains(chunkKey(chunkX, chunkZ + 1)))
-				createBorderEdge(worldName, city, edge++, chunkX * 16.0D + 16.0D, chunkZ * 16.0D + 16.0D, chunkX * 16.0D, chunkZ * 16.0D + 16.0D);
+				createBorderEdge(worldName, city, edge++, x1, z1, x0, z1);
 			if(!city.claims.contains(chunkKey(chunkX - 1, chunkZ)))
-				createBorderEdge(worldName, city, edge++, chunkX * 16.0D, chunkZ * 16.0D + 16.0D, chunkX * 16.0D, chunkZ * 16.0D);
+				createBorderEdge(worldName, city, edge++, x0, z1, x0, z0);
 			if(!city.claims.contains(chunkKey(chunkX + 1, chunkZ)))
-				createBorderEdge(worldName, city, edge++, chunkX * 16.0D + 16.0D, chunkZ * 16.0D, chunkX * 16.0D + 16.0D, chunkZ * 16.0D + 16.0D);
+				createBorderEdge(worldName, city, edge++, x1, z0, x1, z1);
 		}
 	}
 

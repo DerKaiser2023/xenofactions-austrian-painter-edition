@@ -34,6 +34,9 @@ logs/
 bin/
 crash-reports/
 
+# fuck you
+dynmap.zip
+
 # Minecraft generated files
 eula.txt
 server.properties

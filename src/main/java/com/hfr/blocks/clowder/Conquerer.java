@@ -3,8 +3,10 @@ package com.hfr.blocks.clowder;
 import com.hfr.blocks.ModBlocks;
 import com.hfr.clowder.Clowder;
 import com.hfr.clowder.ClowderTerritory;
+import com.hfr.clowder.ClowderTerritory.CoordPair;
 import com.hfr.clowder.ClowderTerritory.TerritoryMeta;
 import com.hfr.command.CommandClowderAdmin;
+import com.hfr.config.XFConfig;
 import com.hfr.tileentity.clowder.TileEntityConquerer;
 import com.hfr.tileentity.clowder.TileEntityFlag;
 
@@ -55,7 +57,7 @@ public class Conquerer extends BlockContainer {
 		TileEntity tile = world.getTileEntity(x, y, z);
 		if(tile instanceof TileEntityConquerer) {
 			TileEntityConquerer flag = (TileEntityConquerer)tile;
-			if(flag.owner == null || !CommandClowderAdmin.WARENABLED || !flag.canSeeSky() || !flag.checkBorder(x, z) || !noProximity(world, x, y, z)) {
+			if(flag.owner == null || (!CommandClowderAdmin.WARENABLED && !XFConfig.enableConquestFlagsPeacetime) || !flag.canSeeSky() || !flag.checkBorder(x, z) || !noProximity(world, x, y, z)) {
 				world.func_147480_a(x, y, z, false);
 				return true;
 			}
@@ -67,7 +69,11 @@ public class Conquerer extends BlockContainer {
 	@Override
 	public void onBlockPlacedBy(World world, int x, int y, int z, EntityLivingBase player, ItemStack itemStack) {
 
-		if (CommandClowderAdmin.WARENABLED) {
+		boolean warEnabled = CommandClowderAdmin.WARENABLED;
+		boolean peacetimeEnabled = XFConfig.enableConquestFlagsPeacetime;
+		boolean canPlace = warEnabled || peacetimeEnabled;
+
+		if (canPlace) {
 
 			int i = MathHelper.floor_double(player.rotationYaw * 4.0F / 360.0F + 0.5D) & 3;
 
@@ -90,8 +96,23 @@ public class Conquerer extends BlockContainer {
 			Clowder clowder = Clowder.getClowderFromPlayer((EntityPlayer) player);
 			flag.owner = clowder;
 
-			if (clowder != null && flag.checkBorder(x, z) && flag.canSeeSky() && noProximity(world, x, y, z)) {
+			CoordPair loc = ClowderTerritory.getCoordPair(world, x, z);
+			TerritoryMeta meta = ClowderTerritory.getMetaFromCoords(loc);
+			boolean isWilderness = meta == null || meta.owner == null || meta.owner.zone == ClowderTerritory.Zone.WILDERNESS;
+			boolean isEnemyFaction = meta != null && meta.owner != null && meta.owner.zone == ClowderTerritory.Zone.FACTION && meta.owner.owner != clowder;
 
+			boolean validPlacement = false;
+			if (warEnabled) {
+				if (clowder != null && flag.checkBorder(x, z) && flag.canSeeSky() && noProximity(world, x, y, z)) {
+					validPlacement = true;
+				}
+			} else if (peacetimeEnabled) {
+				if (clowder != null && isWilderness && flag.canSeeSky() && noProximity(world, x, y, z)) {
+					validPlacement = true;
+				}
+			}
+
+			if (validPlacement) {
 				flag.owner.addPrestigeReq(Clowder.flagReq(), world);
 				flag.markDirty();
 				MinecraftServer.getServer().getConfigurationManager().sendChatMsg(new ChatComponentText(
@@ -105,14 +126,19 @@ public class Conquerer extends BlockContainer {
 				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "You won't be able to raise this flag. This may be due to:"));
 				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-You not being in any faction"));
 				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-The flag not having sky access"));
-				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-The flag not being in a foreign border chunk"));
-				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-No active war with the defending faction, or either side is not raidable"));
+				if (warEnabled) {
+					((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-The flag not being in a foreign border chunk"));
+					((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-No active war with the defending faction, or either side is not raidable"));
+				} else if (peacetimeEnabled) {
+					if (isEnemyFaction) {
+						((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-Wars are enabled; conquest flags can only be placed in enemy territory during war"));
+					} else {
+						((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-The flag must be placed in wilderness (unclaimed land)"));
+					}
+				}
 				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "-The flag being too close to another conquest flag"));
-				//give back the flag then, RETARD
 				((EntityPlayer) player).inventory.addItemStackToInventory
 				(new ItemStack(ModBlocks.clowder_conquerer, 1));
-				//world.setBlockToAir(x, y, z);
-				//not needed
 			}
 		}
 
@@ -121,10 +147,15 @@ public class Conquerer extends BlockContainer {
 			if (player instanceof EntityPlayer && !world.isRemote) {
 				TileEntityConquerer flag = (TileEntityConquerer) world.getTileEntity(x, y, z);
 				flag.owner = null;
-				//give back the flag
 				((EntityPlayer) player).inventory.addItemStackToInventory
 						(new ItemStack(ModBlocks.clowder_conquerer, 1));
-				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + "Peacetime enabled!"));
+				if (warEnabled) {
+					((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + "Peacetime enabled!"));
+				} else if (peacetimeEnabled) {
+					((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + "Conquest flags are disabled! Enable wars or peacetime conquest flags in config."));
+				} else {
+					((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "Conquest flags are disabled! Enable wars or peacetime conquest flags in config."));
+				}
 			}
 		}
 

@@ -90,6 +90,7 @@ public final class XFConfig {
 	public static boolean enableCustomFactionFlags = true;
 	public static boolean enableNewPlayerProtection = false;
 	public static boolean enableConquestFlagsCommand = true;
+	public static boolean enableConquestFlagsPeacetime = false;
 	public static boolean enableGuideBook = true;
 	public static boolean enableNEIIntegration = true;
 	public static boolean enableSurvivalRecipes = true;
@@ -258,6 +259,7 @@ public final class XFConfig {
 		enableCustomFactionFlags = bool(config, CAT_MODULES, "enableCustomFactionFlags", enableCustomFactionFlags, "Enables imported custom faction flags via /c flag seturl.");
 		enableNewPlayerProtection = bool(config, CAT_MODULES, "enableNewPlayerProtection", enableNewPlayerProtection, "Enables starter PvP/keep-inventory protection for first-time players.");
 		enableConquestFlagsCommand = bool(config, CAT_MODULES, "enableConquestFlagsCommand", enableConquestFlagsCommand, "Enables the /xflags command that grants conquest flags while wars are enabled.");
+		enableConquestFlagsPeacetime = bool(config, CAT_MODULES, "enableConquestFlagsPeacetime", false, "Allows conquest flags to claim wilderness chunks when wars are disabled. Claimed chunks generate prestige but are not part of cities until city upgrade absorbs them.");
 		enableGuideBook = bool(config, CAT_MODULES, "enableGuideBook", enableGuideBook, "Registers the optional Guide-API Xenofactions Handbook when Guide-API is installed.");
 		enableNEIIntegration = bool(config, CAT_MODULES, "enableNEIIntegration", enableNEIIntegration, "Enables optional Not Enough Items recipe/usage display handlers when NEI is installed.");
 		enableSurvivalRecipes = bool(config, CAT_MODULES, "enableSurvivalRecipes", enableSurvivalRecipes, "Registers survival recipes for established Xenofactions faction infrastructure. Disable to retain command/shop distribution only.");

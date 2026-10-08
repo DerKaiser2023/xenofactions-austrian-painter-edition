@@ -1,6 +1,7 @@
 package com.hfr.items;
 
 import com.hfr.blocks.ModBlocks;
+import com.hfr.config.XFConfig;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.entity.player.EntityPlayer;
@@ -22,7 +23,7 @@ public class ItemBlockConqueror extends ItemBlock {
 
     @Override
     public ItemStack onItemRightClick(ItemStack heldStack, World world, EntityPlayer player) {
-        if (WARENABLED) {
+        if (WARENABLED || XFConfig.enableConquestFlagsPeacetime) {
             // Raytrace to find where the player is aiming
             MovingObjectPosition target = getMovingObjectPositionFromPlayer(world, player, true);
 

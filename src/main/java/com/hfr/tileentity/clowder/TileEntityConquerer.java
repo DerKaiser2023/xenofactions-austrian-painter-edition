@@ -11,6 +11,7 @@ import com.hfr.clowder.ClowderTerritory.CoordPair;
 import com.hfr.clowder.ClowderTerritory.Ownership;
 import com.hfr.clowder.ClowderTerritory.TerritoryMeta;
 import com.hfr.clowder.ClowderTerritory.Zone;
+import com.hfr.config.XFConfig;
 import com.hfr.main.MainRegistry;
 import com.hfr.packet.PacketDispatcher;
 import com.hfr.packet.client.CityRenameGuiPacket;
@@ -148,35 +149,48 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 		CoordPair loc = ClowderTerritory.getCoordPair(worldObj, xCoord, zCoord);
 		TerritoryMeta meta = ClowderTerritory.getMetaFromCoords(loc);
 		
-		if(meta != null && meta.owner.zone == Zone.FACTION && meta.owner.owner != this.owner
-				&& this.owner != null && this.owner.canRaid(meta.owner.owner)) {
+		boolean warEnabled = com.hfr.command.CommandClowderAdmin.WARENABLED;
+		boolean peacetimeEnabled = XFConfig.enableConquestFlagsPeacetime;
+		
+		if (warEnabled) {
+			if(meta != null && meta.owner.zone == Zone.FACTION && meta.owner.owner != this.owner
+					&& this.owner != null && this.owner.canRaid(meta.owner.owner)) {
 
-			CoordPair loc2 = ClowderTerritory.getCoordPair(worldObj, meta.flagX, meta.flagZ);
-			
-			TileEntity te = worldObj.getTileEntity(meta.flagX, meta.flagY, meta.flagZ);
-			
-			if(loc.equals(loc2)) {
-				if(te instanceof TileEntityFlagBig) {
-					((TileEntityFlagBig)te).owner = this.owner;
-					((TileEntityFlagBig)te).generateClaim();
-					te.markDirty();
-					worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
-					
-				} else if(te instanceof TileEntityFlag) {
-					TileEntityFlag city = (TileEntityFlag)te;
-					city.setOwner(owner);
-					city.generateClaim();
-					promptCityRename(city);
-					worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
-					
-				} else if(te instanceof TileEntityConquerer) {
-					worldObj.func_147480_a(meta.flagX, meta.flagY, meta.flagZ, false);
+				CoordPair loc2 = ClowderTerritory.getCoordPair(worldObj, meta.flagX, meta.flagZ);
+				
+				TileEntity te = worldObj.getTileEntity(meta.flagX, meta.flagY, meta.flagZ);
+				
+				if(loc.equals(loc2)) {
+					if(te instanceof TileEntityFlagBig) {
+						((TileEntityFlagBig)te).owner = this.owner;
+						((TileEntityFlagBig)te).generateClaim();
+						te.markDirty();
+						worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
+						
+					} else if(te instanceof TileEntityFlag) {
+						TileEntityFlag city = (TileEntityFlag)te;
+						city.setOwner(owner);
+						city.generateClaim();
+						promptCityRename(city);
+						worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
+						
+					} else if(te instanceof TileEntityConquerer) {
+						worldObj.func_147480_a(meta.flagX, meta.flagY, meta.flagZ, false);
+						ClowderTerritory.setOwnerForCoord(worldObj, loc, owner, xCoord, yCoord, zCoord, name);
+					}
+				} else {
 					ClowderTerritory.setOwnerForCoord(worldObj, loc, owner, xCoord, yCoord, zCoord, name);
 				}
+				
 			} else {
-				ClowderTerritory.setOwnerForCoord(worldObj, loc, owner, xCoord, yCoord, zCoord, name);
+				worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
 			}
-			
+		} else if (peacetimeEnabled) {
+			if (meta == null || (meta.owner != null && meta.owner.zone == Zone.WILDERNESS)) {
+				ClowderTerritory.setOwnerForCoord(worldObj, loc, this.owner, xCoord, yCoord, zCoord, name);
+			} else {
+				worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
+			}
 		} else {
 			worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
 		}
@@ -203,29 +217,40 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 
 		CoordPair loc = ClowderTerritory.getCoordPair(worldObj, x, z);
 		Ownership owner = ClowderTerritory.getOwnerFromCoords(loc);
-		if(owner.zone != Zone.FACTION || owner.owner == this.owner || this.owner == null)
+		
+		boolean warEnabled = com.hfr.command.CommandClowderAdmin.WARENABLED;
+		boolean peacetimeEnabled = XFConfig.enableConquestFlagsPeacetime;
+		
+		if (warEnabled) {
+			if(owner.zone != Zone.FACTION || owner.owner == this.owner || this.owner == null)
+				return false;
+			if(!this.owner.canRaid(owner.owner))
+				return false;
+		} else if (peacetimeEnabled) {
+			if(owner.zone != Zone.WILDERNESS || this.owner == null)
+				return false;
+		} else {
 			return false;
-		if(!this.owner.canRaid(owner.owner))
-			return false;
+		}
 		
 		CoordPair loc1 = ClowderTerritory.getCoordPair(worldObj, x + 16, z);
 		Ownership owner1 = ClowderTerritory.getOwnerFromCoords(loc1);
-		if(owner1.zone == Zone.WILDERNESS || owner1.owner != owner.owner)
+		if(owner1.zone == Zone.WILDERNESS || (warEnabled && owner1.owner != owner.owner))
 			return true;
 		
 		CoordPair loc2 = ClowderTerritory.getCoordPair(worldObj, x - 16, z);
 		Ownership owner2 = ClowderTerritory.getOwnerFromCoords(loc2);
-		if(owner2.zone == Zone.WILDERNESS || owner2.owner != owner.owner)
+		if(owner2.zone == Zone.WILDERNESS || (warEnabled && owner2.owner != owner.owner))
 			return true;
 		
 		CoordPair loc3 = ClowderTerritory.getCoordPair(worldObj, x, z + 16);
 		Ownership owner3 = ClowderTerritory.getOwnerFromCoords(loc3);
-		if(owner3.zone == Zone.WILDERNESS || owner3.owner != owner.owner)
+		if(owner3.zone == Zone.WILDERNESS || (warEnabled && owner3.owner != owner.owner))
 			return true;
 		
 		CoordPair loc4 = ClowderTerritory.getCoordPair(worldObj, x, z - 16);
 		Ownership owner4 = ClowderTerritory.getOwnerFromCoords(loc4);
-		if(owner4.zone == Zone.WILDERNESS || owner4.owner != owner.owner)
+		if(owner4.zone == Zone.WILDERNESS || (warEnabled && owner4.owner != owner.owner))
 			return true;
 		
 		return false;

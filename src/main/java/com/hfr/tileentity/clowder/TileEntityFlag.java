@@ -406,7 +406,8 @@ public class TileEntityFlag extends TileEntityMachineBase implements ITerritoryP
 				CoordPair loc = ClowderTerritory.getCoordPair(worldObj, xCoord + x * 16, zCoord + z * 16);
 				TerritoryMeta meta = ClowderTerritory.getMetaFromCoords(loc);
 				if(expected.contains(loc)) {
-					if(meta == null || !meta.checkPersistence(worldObj, loc) || (meta.flagX == xCoord && meta.flagY == yCoord && meta.flagZ == zCoord)) {
+					boolean sameFactionWildernessClaim = meta != null && meta.owner != null && meta.owner.zone == ClowderTerritory.Zone.FACTION && meta.owner.owner == owner && !getCityId().equals(meta.cityId);
+					if(meta == null || !meta.checkPersistence(worldObj, loc) || (meta.flagX == xCoord && meta.flagY == yCoord && meta.flagZ == zCoord) || sameFactionWildernessClaim) {
 						ClowderTerritory.setOwnerForCoord(worldObj, loc, owner, xCoord, yCoord, zCoord, name, getCityId());
 						TerritoryMeta newMeta = ClowderTerritory.getMetaFromCoords(loc);
 						if(newMeta != null) {

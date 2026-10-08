@@ -7,6 +7,7 @@ import com.hfr.clowder.ClowderTerritory.CoordPair;
 import com.hfr.clowder.ClowderTerritory.TerritoryMeta;
 import com.hfr.command.CommandClowderAdmin;
 import com.hfr.config.XFConfig;
+import com.hfr.main.MainRegistry;
 import com.hfr.tileentity.clowder.TileEntityConquerer;
 import com.hfr.tileentity.clowder.TileEntityFlag;
 
@@ -17,11 +18,10 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
+import org.apache.logging.log4j.Level;
 
 public class Conquerer extends BlockContainer {
 
@@ -95,6 +95,7 @@ public class Conquerer extends BlockContainer {
 
 			Clowder clowder = Clowder.getClowderFromPlayer((EntityPlayer) player);
 			flag.owner = clowder;
+			flag.placerName = player.getCommandSenderName();
 
 			CoordPair loc = ClowderTerritory.getCoordPair(world, x, z);
 			TerritoryMeta meta = ClowderTerritory.getMetaFromCoords(loc);
@@ -115,12 +116,9 @@ public class Conquerer extends BlockContainer {
 			if (validPlacement) {
 				flag.owner.addPrestigeReq(Clowder.flagReq(), world);
 				flag.markDirty();
-				MinecraftServer.getServer().getConfigurationManager().sendChatMsg(new ChatComponentText(
-						EnumChatFormatting.RED + "[WAR] " + EnumChatFormatting.GOLD + clowder.name +
-						EnumChatFormatting.YELLOW + " placed a claim flag for " + getTargetCityName(world, x, z) +
-						EnumChatFormatting.YELLOW + " in " + EnumChatFormatting.AQUA + formatDimension(world) +
-						EnumChatFormatting.YELLOW + " at " + EnumChatFormatting.AQUA + "(" + x + ", " + y + ", " + z + ")"
-				));
+				if (MainRegistry.logger != null) {
+					MainRegistry.logger.log(Level.INFO, "[WAR] " + clowder.name + " placed a claim flag for " + getTargetCityName(world, x, z).replaceAll("§[0-9a-fk-or]", "") + " in " + formatDimension(world) + " at (" + x + ", " + y + ", " + z + ")");
+				}
 			} else {
 				flag.owner = null;
 				((EntityPlayer) player).addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "You won't be able to raise this flag. This may be due to:"));

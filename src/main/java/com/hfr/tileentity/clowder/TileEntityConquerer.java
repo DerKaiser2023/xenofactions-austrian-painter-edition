@@ -4,6 +4,7 @@ import static net.minecraftforge.common.util.ForgeDirection.UP;
 
 import java.util.List;
 
+import com.hfr.blocks.ModBlocks;
 import com.hfr.clowder.Clowder;
 import com.hfr.clowder.ClowderFlag;
 import com.hfr.clowder.ClowderTerritory;
@@ -31,6 +32,7 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 	public float height = 0.0F;
 	public static final float speed = 1.0F / (20F * 40F);
 	public String name = "";
+	public String placerName = "";
 	
 	@SideOnly(Side.CLIENT)
 	public ClowderFlag flag;
@@ -74,33 +76,57 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 							yCoord + 4,
 							zCoord + 0.5 + range));
 			
-			boolean canRaise = false;
+			int attackerCount = 0;
+			int defenderCount = 0;
+			Clowder defenderFaction = null;
+			
+			// Get the defending faction from the territory
+			CoordPair loc = ClowderTerritory.getCoordPair(worldObj, xCoord, zCoord);
+			TerritoryMeta meta = ClowderTerritory.getMetaFromCoords(loc);
+			if (meta != null && meta.owner != null && meta.owner.zone == Zone.FACTION) {
+				defenderFaction = meta.owner.owner;
+			}
 			
 			for(EntityPlayer player : entities) {
 				
 				Clowder clow = Clowder.getClowderFromPlayer(player);
 				
 				if(clow != null) {
-					
 					if(clow == owner) {
-						canRaise = true;
+						attackerCount++;
+					} else if (defenderFaction != null && clow == defenderFaction) {
+						defenderCount++;
 					}
 				}
 			}
 			
 			double prev = height;
+			float effectiveSpeed = 0;
 			
-			if((!canRaise && height < 1)) {
-				height -= speed;
-			} else if(height < 1) {
-				height += speed;
+			if (attackerCount > defenderCount) {
+				effectiveSpeed = speed * (attackerCount - defenderCount);
+				if (height < 1) {
+					height += effectiveSpeed;
+				}
+			} else if (defenderCount > attackerCount) {
+				effectiveSpeed = speed * (defenderCount - attackerCount);
+				if (height > 0) {
+					height -= effectiveSpeed;
+				}
 			}
+			// If equal, flag freezes (effectiveSpeed = 0)
 			
 			if(height < 0)
 				height = 0;
 			
 			if(height > 1)
 				height = 1;
+			
+			// Check if flag is fully lowered - break it and return to placer
+			if (height <= 0 && prev > 0) {
+				breakFlagAndReturnToPlacer();
+				return;
+			}
 			
 			if(height >= 1 && prev < 1) {
 				
@@ -196,6 +222,16 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 		}
 	}
 	
+	private void breakFlagAndReturnToPlacer() {
+		if (!placerName.isEmpty()) {
+			EntityPlayer placer = worldObj.getPlayerEntityByName(placerName);
+			if (placer != null && !placer.capabilities.isCreativeMode) {
+				placer.inventory.addItemStackToInventory(new ItemStack(ModBlocks.clowder_conquerer, 1));
+			}
+		}
+		worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
+	}
+	
 	private void promptCityRename(TileEntityFlag city) {
 		int range = 32;
 		List<EntityPlayer> entities = worldObj.getEntitiesWithinAABB(EntityPlayer.class,
@@ -282,6 +318,7 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 		
 		this.height = nbt.getFloat("height");
 		this.name = nbt.getString("name");
+		this.placerName = nbt.getString("placerName");
 	}
 	
 	@Override
@@ -297,6 +334,7 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 		
 		nbt.setFloat("height", height);
 		nbt.setString("name", name);
+		nbt.setString("placerName", placerName);
 	}
 
 	@Override

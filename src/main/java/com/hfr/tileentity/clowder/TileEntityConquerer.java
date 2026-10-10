@@ -203,10 +203,10 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 						
 					} else if(te instanceof TileEntityConquerer) {
 						worldObj.func_147480_a(meta.flagX, meta.flagY, meta.flagZ, false);
-						ClowderTerritory.setOwnerForCoord(worldObj, loc, owner, xCoord, yCoord, zCoord, name);
+						ClowderTerritory.setOwnerForConquerer(worldObj, loc, owner, xCoord, yCoord, zCoord, name);
 					}
 				} else {
-					ClowderTerritory.setOwnerForCoord(worldObj, loc, owner, xCoord, yCoord, zCoord, name);
+					ClowderTerritory.setOwnerForConquerer(worldObj, loc, owner, xCoord, yCoord, zCoord, name);
 				}
 				
 			} else {
@@ -214,7 +214,7 @@ public class TileEntityConquerer extends TileEntityMachineBase implements ITerri
 			}
 		} else if (peacetimeEnabled) {
 			if (meta == null || (meta.owner != null && meta.owner.zone == Zone.WILDERNESS)) {
-				ClowderTerritory.setOwnerForCoord(worldObj, loc, this.owner, xCoord, yCoord, zCoord, name);
+				ClowderTerritory.setOwnerForConquerer(worldObj, loc, this.owner, xCoord, yCoord, zCoord, name);
 			} else {
 				worldObj.func_147480_a(xCoord, yCoord, zCoord, false);
 			}

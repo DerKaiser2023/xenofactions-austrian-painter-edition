@@ -440,40 +440,7 @@ public class ClowderTerritory {
 		com.hfr.dynmap.XFDynmapIntegration.markDirty();
 	}
 
-	//sets the owner of a chunk to a clowder as a non-city (conquest) claim
-	public static void setOwnerForConquerer(World world, CoordPair coords, Clowder owner, int fX, int fY, int fZ, String name) {
-		setOwnerForConquerer(world, coords.x, coords.z, owner, fX, fY, fZ, name);
-	}
-	public static void setOwnerForConquerer(World world, int x, int z, Clowder owner, int fX, int fY, int fZ, String name) {
-		if(!XFConfig.canClaimInDimension(getDimensionId(world)))
-			return;
-		CoordPair code = new CoordPair(getDimensionId(world), x, z);
-		TerritoryMeta oldMeta = territories.remove(code);
-		Clowder oldOwner = oldMeta == null || oldMeta.owner == null ? null : oldMeta.owner.owner;
-
-		Ownership o = new Ownership(Zone.FACTION, owner);
-		TerritoryMeta metadata = new TerritoryMeta(o, fX, fY, fZ);
-		metadata.name = name;
-		metadata.cityName = name;
-		metadata.dimensionId = getDimensionId(world);
-		metadata.cityId = "";
-		metadata.flagY = -1;
-		TileEntity flag = world.getTileEntity(fX, fY, fZ);
-		if(flag != null) {
-			if(flag instanceof com.hfr.tileentity.clowder.TileEntityFlagBig)
-				((com.hfr.tileentity.clowder.TileEntityFlagBig)flag).provinceName = name;
-			else if(flag instanceof com.hfr.tileentity.clowder.TileEntityConquerer)
-				((com.hfr.tileentity.clowder.TileEntityConquerer)flag).name = name;
-		}
-		territories.put(code, metadata);
-		if(oldOwner != null) oldOwner.endBuildGraceIfHomeInvalid(world, true);
-		if(owner != null) owner.reconcileCitiesFounded(world);
-		ClowderData.getData(world).markDirty();
-		com.hfr.dynmap.XFDynmapIntegration.markDirty();
-	}
-
-	
-	//removes territory metadata
+//removes territory metadata
 	public static void removeZoneForCoord(World world, CoordPair coords) {
 
 		removeZoneForInts(world, coords.x, coords.z);
@@ -493,40 +460,7 @@ public class ClowderTerritory {
 		com.hfr.dynmap.XFDynmapIntegration.markDirty();
 	}
 
-	//sets the owner of a chunk to a clowder as a non-city (conquest) claim
-	public static void setOwnerForConquerer(World world, CoordPair coords, Clowder owner, int fX, int fY, int fZ, String name) {
-		setOwnerForConquerer(world, coords.x, coords.z, owner, fX, fY, fZ, name);
-	}
-	public static void setOwnerForConquerer(World world, int x, int z, Clowder owner, int fX, int fY, int fZ, String name) {
-		if(!XFConfig.canClaimInDimension(getDimensionId(world)))
-			return;
-		CoordPair code = new CoordPair(getDimensionId(world), x, z);
-		TerritoryMeta oldMeta = territories.remove(code);
-		Clowder oldOwner = oldMeta == null || oldMeta.owner == null ? null : oldMeta.owner.owner;
-
-		Ownership o = new Ownership(Zone.FACTION, owner);
-		TerritoryMeta metadata = new TerritoryMeta(o, fX, fY, fZ);
-		metadata.name = name;
-		metadata.cityName = name;
-		metadata.dimensionId = getDimensionId(world);
-		metadata.cityId = "";
-		metadata.flagY = -1;
-		TileEntity flag = world.getTileEntity(fX, fY, fZ);
-		if(flag != null) {
-			if(flag instanceof com.hfr.tileentity.clowder.TileEntityFlagBig)
-				((com.hfr.tileentity.clowder.TileEntityFlagBig)flag).provinceName = name;
-			else if(flag instanceof com.hfr.tileentity.clowder.TileEntityConquerer)
-				((com.hfr.tileentity.clowder.TileEntityConquerer)flag).name = name;
-		}
-		territories.put(code, metadata);
-		if(oldOwner != null) oldOwner.endBuildGraceIfHomeInvalid(world, true);
-		if(owner != null) owner.reconcileCitiesFounded(world);
-		ClowderData.getData(world).markDirty();
-		com.hfr.dynmap.XFDynmapIntegration.markDirty();
-	}
-
-	
-	//returns the ownership information of the chunk
+//returns the ownership information of the chunk
 	public static Ownership getOwnerFromCoords(CoordPair coords) {
 		
 		return getOwner(coords.dimensionId, coords.x, coords.z);
@@ -1008,43 +942,11 @@ public class ClowderTerritory {
 				territories.put(code, meta);
 			}
 		}
-		if(migrated > 0 && MainRegistry.logger != null)
+if(migrated > 0 && MainRegistry.logger != null)
 			MainRegistry.logger.info("Migrated " + migrated + " legacy faction territory entries to dimension 0 claim keys.");
 		com.hfr.dynmap.XFDynmapIntegration.markDirty();
 	}
-
-	//sets the owner of a chunk to a clowder as a non-city (conquest) claim
-	public static void setOwnerForConquerer(World world, CoordPair coords, Clowder owner, int fX, int fY, int fZ, String name) {
-		setOwnerForConquerer(world, coords.x, coords.z, owner, fX, fY, fZ, name);
-	}
-	public static void setOwnerForConquerer(World world, int x, int z, Clowder owner, int fX, int fY, int fZ, String name) {
-		if(!XFConfig.canClaimInDimension(getDimensionId(world)))
-			return;
-		CoordPair code = new CoordPair(getDimensionId(world), x, z);
-		TerritoryMeta oldMeta = territories.remove(code);
-		Clowder oldOwner = oldMeta == null || oldMeta.owner == null ? null : oldMeta.owner.owner;
-
-		Ownership o = new Ownership(Zone.FACTION, owner);
-		TerritoryMeta metadata = new TerritoryMeta(o, fX, fY, fZ);
-		metadata.name = name;
-		metadata.cityName = name;
-		metadata.dimensionId = getDimensionId(world);
-		metadata.cityId = "";
-		metadata.flagY = -1;
-		TileEntity flag = world.getTileEntity(fX, fY, fZ);
-		if(flag != null) {
-			if(flag instanceof com.hfr.tileentity.clowder.TileEntityFlagBig)
-				((com.hfr.tileentity.clowder.TileEntityFlagBig)flag).provinceName = name;
-			else if(flag instanceof com.hfr.tileentity.clowder.TileEntityConquerer)
-				((com.hfr.tileentity.clowder.TileEntityConquerer)flag).name = name;
-		}
-		territories.put(code, metadata);
-		if(oldOwner != null) oldOwner.endBuildGraceIfHomeInvalid(world, true);
-		if(owner != null) owner.reconcileCitiesFounded(world);
-		ClowderData.getData(world).markDirty();
-		com.hfr.dynmap.XFDynmapIntegration.markDirty();
-	}
-
+	
 	
 	public static void writeToNBT(NBTTagCompound nbt) {
 		

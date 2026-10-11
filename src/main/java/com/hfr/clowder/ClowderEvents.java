@@ -744,13 +744,9 @@ if(!player.inventory.hasItem(ModItems.debug) && MainRegistry.disableChests && (o
 		String name = owner.zone.toString();
 		
 		if(owner.zone == Zone.FACTION) {
-			if(meta != null && !meta.isCityClaim()) {
-				name = Zone.WILDERNESS.toString();
-			} else {
-				name = owner.owner.name;
-				if(meta != null)
-					name += meta.name;
-			}
+			name = owner.owner.name;
+			if(meta != null)
+				name += meta.name;
 		} else {
 			if(meta != null)
 				name += meta.name;
@@ -766,18 +762,13 @@ if(!player.inventory.hasItem(ModItems.debug) && MainRegistry.disableChests && (o
 		if(!name.equals(past)) {
 
 			if(owner.zone == Zone.FACTION) {
+				String title = meta == null ? "" : meta.name;
+				PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(owner.owner, title), (EntityPlayerMP) player);
 				
-				if(meta != null && !meta.isCityClaim()) {
-					PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(Zone.WILDERNESS.toString()), (EntityPlayerMP) player);
-				} else {
-					String title = meta == null ? "" : meta.name;
-					PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(owner.owner, title), (EntityPlayerMP) player);
-					
-					Clowder mine = Clowder.getClowderFromPlayer(player);
-					
-					if(player.inventory.hasItem(ModItems.mace) && mine != owner.owner)
-						owner.owner.notifyAll(player.worldObj, new ChatComponentText(CommandClowder.ERROR + "A raider has just entered your territory!"));
-				}
+				Clowder mine = Clowder.getClowderFromPlayer(player);
+				
+				if(player.inventory.hasItem(ModItems.mace) && mine != owner.owner)
+					owner.owner.notifyAll(player.worldObj, new ChatComponentText(CommandClowder.ERROR + "A raider has just entered your territory!"));
 				
 			} else {
 				PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(name), (EntityPlayerMP) player);

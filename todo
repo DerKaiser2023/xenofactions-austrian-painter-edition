@@ -1,0 +1,10 @@
+have wilderness faction claims display wilderness when entering chunk
+
+                    examplefactions
+
+                      wilderness
+
+have faction's wilderness chunks combine on dynmap (one chunk borders look uuuggglllyyyy)
+
+
+fix some bs (i think the only thing to be fixed is flag hoisting print in logs)

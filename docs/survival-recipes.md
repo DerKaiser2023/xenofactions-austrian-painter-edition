@@ -21,6 +21,8 @@ Each diagram is a 3x3 crafting grid; a space is empty.
 | City Center | `GEG / ODO / IRI` | G gold ingot, E emerald, O obsidian, D diamond, I iron ingot, R redstone | Major founding infrastructure has a substantial one-diamond, one-emerald investment, while later cities still remain replaceable. |
 | Conquest Flag | `LWL / GRG / ISI` | L leather, W wool, G gold ingot, R redstone, I iron ingot, S stick | War infrastructure costs gold and iron, but destruction does not demand excessive diamond grinding. |
 | Officer Chest | `I I / ICI / IRI` | I iron ingot, C chest, R redstone | A basic role-gated utility priced near other protected storage. |
+| Global Market Terminal | `IRI / ECE / IRI` | I iron ingot, R redstone, E emerald, C chest | One active terminal per faction, placed by Officers or leaders inside the designated capital. All faction members can use it. |
+| Player Trader | `IRI / ECE / IRI` | I iron ingot, R redstone, E emerald, C trapped chest | A stocked, single-offer player shop that uses existing items, including coins or tax items, as payment. |
 | Medical Tent | `WWW / WRW / S S` | W wool, R golden apple, S stick | Accessible field infrastructure with a meaningful healing ingredient. |
 | Warp Tent | `WWW / PEP / SRS` | W wool, P ender pearl, E eye of ender, S stick, R redstone | Teleport utility appropriately begins after access to Endermen and the Nether. |
 | Coal Mine | `SMS / MCM / SIS` | S scaffold component, M mechanical component, C chest, I minecart | Moderate industrial entry cost aligned with its workforce/supply-driven coal output. |
@@ -31,18 +33,34 @@ Each diagram is a 3x3 crafting grid; a space is empty.
 
 All recipe leaves are obtainable vanilla materials or existing craftable Xenofactions components. The dependency graph is one-way (vanilla materials → components → infrastructure), with no recipe output required to make itself.
 
+## Fortification recipes
+
+`XenoRecipes` also registers these seven fortification recipes under the same `enableSurvivalRecipes` gate. No other building props gain recipes.
+
+| Output | Layout | Ingredients |
+| --- | --- | --- |
+| Sandbags (`barricade`), 4 | ` S  / SWS /  S ` | Four sand blocks (normal or red sand), one wool block of any color. |
+| HESCO Terrablock, 2 | `BSB / ISI / BSB` | Four iron bars, three sandbags, two OreDictionary `ingotIron` ingots. |
+| Stone Wall, 4 | `S S / S S / S S` | Six OreDictionary `cobblestone` blocks; vertical columns avoid the vanilla cobblestone-wall recipe. |
+| Brick Wall, 4 | `BBB / BBB` | Six vanilla brick blocks. |
+| Great Wall, 4 | `SSS / SSS` | Six vanilla stone-brick blocks; the masonry variant sharing `PropWall` with Stone Wall and Brick Wall. |
+| Palisade, 4 | `LLL / SSS / LLL` | Six OreDictionary `logWood` logs and three sticks. |
+| Berlin Wall, 2 | `SBS / SBS / SBS` | Six stone blocks and three iron bars for the taller reinforced wall. |
+
+Outputs use item metadata 0. Sandbag facing and wall/HESCO/Palisade/Berlin Wall multiblock core/dummy metadata are assigned during placement, not separate craftable variants. The two existing rubber-based sandbag recipes remain registered independently of the survival toggle.
+
 ## Deliberate exclusions
 
 The complete registered-content audit excluded the following rather than generating recipes from registry names:
 
 * **Internal/generated blocks:** `clowder_cap`, blast-door dummy, seal hatch, crop blocks, and multiblock internals are placed or managed by code and are not player crafting outputs.
-* **Admin/economy infrastructure:** Market is unbreakable and backs the operator-managed stock/shop economy; the debug block, debug item, administration wands, out-of-bounds wand, and internal capsule remain non-craftable.
+* **Admin/economy infrastructure:** The original admin XShop remains unbreakable and non-craftable. The separate Global Market Terminal above is craftable and breakable; it browses only shops explicitly made available by the server. The debug block, debug item, administration wands, out-of-bounds wand, and internal capsule remain non-craftable.
 * **Legacy claim presentation:** the Big Flag and cap belong to legacy/generated claim representation; current city founding uses the named City Center. The faction banner already has a recipe and is cosmetic rather than infrastructure.
 * **Incomplete or disconnected machines:** radar/legacy defense, seals and blast door, hydro core, net, coal generator, battery, windmill, waterwheel, diesel generator, alloy machine, and registered-but-disabled machine/weapon fields were not promoted merely because a class, renderer, or registry entry exists. Some retain isolated mechanics, but their broader power/resource chains are incomplete or legacy.
-* **Decorative/building blocks:** mud, rope, temporary/asphalt blocks, Wall Art, HESCO/palisade/wall variants, Berlin wall, and similar props are decorative, generated, independently sourced, or outside the core faction loop. Existing recipes (for example barricades) remain untouched.
+* **Other decorative/building blocks:** mud, rope, temporary/asphalt blocks, Wall Art, and similar props remain outside this addition. Only the fortifications listed above gain recipes; existing recipes remain untouched.
 * **Legacy content families:** missiles, naval/railgun charges, vehicle/gun parts and kits, nuclear materials, canisters/fluids, armor, grenades, food jokes, cassettes, multipliers, repair parts, and other old HFR items are incomplete, externally dependent, debug-oriented, or unrelated to established Xenofactions faction gameplay. Existing recipes and machine outputs remain unchanged.
 * **Runtime currencies and outputs:** prestige is data rather than an item. Science, cogs, scrolls, tax/coins, flour, coal-mine workforce/supplies, and other machine products are generated/consumed by their established systems; direct crafting would bypass those systems. Rice/food and already-craftable supplies retain their old acquisition paths.
 
-Disabling the toggle only omits the eleven recipes above and returns `/c claim` to its prior free named-token behavior. It never gates blocks/items, changes registry names/IDs, removes pre-existing recipes, or changes placed tile entities and saved data.
+Disabling the toggle omits recipes registered by `XenoRecipes`, including the seven fortification recipes, and returns `/c claim` to its prior free named-token behavior. It never gates blocks/items, changes registry names/IDs, removes pre-existing recipes, or changes placed tile entities and saved data.
 
 The Federal Reserve is legacy-only and intentionally has no recipe. See [gameplay permissions and automation](gameplay-permissions-and-automation.md) for its compatibility treatment, hopper foundations, and processor audit.

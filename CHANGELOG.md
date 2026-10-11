@@ -737,3 +737,130 @@ Added `/c stonedrops [page]` as a read-only player-accessible command for viewin
 - Routed live Blue, Red, Terrorist, Counter-Terrorist, and FFA labels through the existing Xenofactions global-chat prefix formatter; teamless and observer players retain neutral/faction behavior, and disabling TDM immediately restores faction prefixes without persisted chat state.
 - Added a shared TDM membership guard at the authoritative faction creation/member-add operations and their create, apply, accept, and administrative force-join entry paths, with clear command and help feedback while leaving existing memberships untouched.
 - Source-level call-site and lifecycle inspection was completed; dedicated-server chat, team/map/mode transition, and faction-command runtime validation remains required.
+
+2026-09-30 00:40 — Add unified admin kit, map, spawn, and area editor
+
+- Added a draggable `/tdm editor gui` with visual kit inventories, map settings, individual RED/BLUE/FFA spawn management, and a compact nearby safezone/warzone and map-area preview.
+- Added creative-inventory kit editing with explicit save/cancel, plus kit cloning, renaming, and BOMB cost edits. The admin's original inventory is restored when editing ends.
+- Added typed map-boundary, BOMB-site, Clowder zone, and world-border-exemption selections with visible A/B state and command fallbacks. Map boundaries remain separate from claims and do not change gameplay containment.
+- New map spawns record facing; existing saved spawns retain their previous facing behavior. Existing kit, map, and zone storage remains compatible.
+
+2026-09-30 01:23 — Add admin selection wand, editor key, and optional map border
+
+- Added one Admin Selection Wand for every area type. Left-clicking a block sets A, right-clicking sets B, and the selection preview updates as points are chosen. Starting a selection gives the wand when inventory space is available.
+- Added a configurable F10 key to toggle the admin editor while keeping `/tdm editor gui` available.
+- Added an optional per-map border toggle. When enabled, active match players cannot leave the map bounds' horizontal area; existing maps keep the border off until an admin enables it.
+
+2026-09-30 02:50 — Add persistent map overlays and separate boundary view
+
+- Added a per-player persistent TDM map overlay with map bounds, nearby Clowder zoning, team or FFA spawn markers, and BOMB sites A and B for active-match players. Administrators can preview a named map with all spawn types.
+- Added a separate administrator toggle for a nearby in-world map-boundary view. The existing optional map-border enforcement remains independent.
+- Drew the map overlay, faction claims, safezones, and warzones in compatible legacy JourneyMap minimaps and fullscreen maps, with a standalone in-game map when JourneyMap is unavailable. Added Dynmap layers for other faction claims, safezones, warzones, and the active map's bounds and BOMB sites; exact web-map spawns require an explicit server setting.
+
+2026-09-30 05:10 — Support JourneyMap 6 and unify border visuals
+
+- Added an optional JourneyMap 6.0.x API 2.0.0 client plugin for claims, zones, map bounds, BOMB sites, and permitted spawns while retaining the older 5.2.x adapter.
+- Changed the in-world map boundary to the existing ground-following Clowder border particle style, visible to active players when a map border is enforced and to administrators using boundary view.
+- Added a client-only F9 toggle for border effects and overlays; it does not change map containment or any server-side state.
+
+2026-09-30 14:37 — Show public map boundaries and Search and Destroy sites consistently
+
+- Show an enabled active map border and active Search and Destroy sites to all players in the map dimension on JourneyMap or the standalone map, without requiring the optional overlay preference. Keep inactive map previews limited to administrators.
+- Make Right Alt the configurable default for in-world border effects only. JourneyMap and standalone map shapes remain visible when those effects are hidden.
+- Align map previews, JourneyMap polygons, containment, and ground-following sparks to inclusive selected blocks. Clowder territory sparks now follow the exact stored territory edges, including negative coordinates.
+
+2026-09-30 15:02 — Reuse maps across gamemodes with separate spawns
+
+- Let one physical map offer distinct TDM, FFA, and Search and Destroy vote options, with independent spawn sets and a selected gamemode that changes with the winning vote.
+- Keep old maps, spawns, and kits usable. Preserve ambiguous old spawns for administrator assignment, support explicit spawn sharing, and let kits be disabled per mode without copying their loadouts.
+- Apply kit buy-score costs only in Search and Destroy. Show that mode's sites and spawn markers only when its map pairing is active, while shared map bounds remain the same.
+
+2026-09-30 19:43 — Show selected map borders without editor overlay
+
+- Publish the selected map's enabled border to every player in its dimension even before a match starts, so JourneyMap no longer requires an administrator to enable a map preview.
+- Remove the Map overlay button from the editor. Right Alt now also shows or hides the standalone fallback map alongside in-world border effects, while JourneyMap borders stay visible.
+
+2026-09-30 23:01 — Restore each administrator's TDM editing workspace
+
+- Save the selected editing map, team, direct kit, page, gamemode view, spawn controls, and reward category per administrator and restore them when the editor reopens. Keep the editing target independent of the active match.
+- Validate saved maps and kits before displaying the panel. Missing targets fall back locally while preserving the remaining valid context; editor navigation remains permission checked and server owned.
+
+2026-09-30 23:28 — Let administrators hide draft maps from TDM voting
+
+- Add a saved map-wide voting switch to the editor and `/tdm map voteable <map> <on|off>`. New maps start excluded; existing maps remain eligible by default.
+- Filter hidden maps from ballot options, vote acceptance, results, and skip alternatives. Disabling a map removes its existing votes and refreshes open vote menus without changing the running match or explicit admin selection.
+
+2026-09-30 23:47 — Keep FFA placement and participation teamless
+
+- Stop team balancing and team-change placement from re-placing FFA players. Resolve FFA spawns as neutral even if a caller supplies a remembered team.
+- Hide dormant RED/BLUE assignments during FFA and reject new team assignments there, while retaining prior assignments for a later team match. Keep mode-wide sound delivery available to FFA competitors.
+
+2026-10-04 05:47 — Craft fortifications and honor Earth boundary crossings
+
+- Add gated survival recipes for sandbags, HESCO Terrablocks, Stone Walls, Brick Walls, and the Great Wall masonry variant. Preserve legacy sandbag recipes and add no recipes for other content.
+- Honor complete selected block footprints and entity movement intersections before Earth wrap destination calculation. Keep exempt boundary sections open outward within their exact edge span, including fast crossings, and spatially index saved rectangles without changing their persistence format.
+- Let mounts own relocation and synchronize vanilla riders once; defer MC Heli child seats to their parent and stop replaying entity ticks during wrapping. Preserve player exemption-exit recovery and normal wrapping, and reduce very large non-exempt displacements to one in-bounds relocation.
+
+2026-10-04 06:12 — Craft Palisades and Berlin Walls
+
+- Add gated survival recipes for four Palisades from logs and sticks, and two reinforced Berlin Walls from stone and iron bars. Use OreDictionary logs for wood compatibility and retain placement-assigned multiblock metadata.
+
+2026-10-02 16:17 - Honor world-border exemptions for non-player entities
+
+- Skip Earth-boundary wrapping for dropped items, NPCs, vehicles, and other non-player entities while their current position is inside a configured exemption region.
+- Preserve existing non-player wrapping outside exemption regions and leave player border handling unchanged.
+
+2026-10-04 09:05 — Associate web-map markers with GTNH Forge world IDs
+
+- Resolve every city, claim, zone, TDM area, border line, and point marker through GTNH/Dynmap's own world naming and normalization APIs. Add automatic dimension mappings and resolve old stock world-name entries automatically while preserving custom overrides and missing/empty dimension suppression.
+- Rebuild markers after server world load/unload so automatic mappings pick up newly loaded dimensions. Preserve marker IDs, geometry, styles, public visibility rules, and nonpersistent publication; support both GTNH 0.3.47's raw-world JSON filter and newer normalized-world filtering.
+
+2026-10-04 22:39 — Manage XShops and faction capital markets
+
+- Create, list, rename, delete, configure, and link shops with /xshop. Administrators can select a shop from a placed XShop's configuration panel, edit offers and access settings, or continue linking with renamed nametags. Shop renames preserve block links and existing shop offers migrate automatically.
+- Craft a separate Global Market Terminal for your faction's designated capital. Officers and leaders may place one active terminal per faction; all faction members can search and browse server-approved shops. Disabled, private, and admin-only shops stay out of the faction market.
+- Designate the founding city as the faction capital, independently of city level. Leaders can change it with /c capital set, with a configurable seven-day cooldown between changes. Set faction homes only inside the designated capital; capital changes deactivate the old terminal and permit a replacement.
+- Recover terminal placement after normal removal or stale world-edit coordinates without searching every chunk. Old terminals cannot become extra active markets after replacement. Require current server permissions and shop access for configuration and trades, and correctly charge repeated currency costs and handle inventory overflow.
+
+2026-10-04 22:39 — Restore normal emerald blocks
+
+- Remove the unused override that made vanilla emerald blocks unbreakable and effectively explosion-proof. Emerald blocks retain their normal mining and blast behavior.
+
+2026-10-04 23:14 — Open XShops for trading before configuration
+
+- Open the trading screen when administrators right-click an XShop, with an explicit Configure button for block management. Keep configuration reachable for unlinked and disabled shops while refusing unavailable trades.
+- Move the trading screen's next-page button one pixel right. Rename the Market toggle to Faction: Shown/Hidden and explain that it controls visibility in faction terminals.
+- Clear TDM state on logout without sending a kit-menu packet through the disconnected player's channel.
+
+2026-10-05 01:11 — Stop automatically awarding Builder Contracts
+
+- Remove the Builder Contract reward when a player founds a city and its obsolete saved grant marker. City founding no longer inserts a contract into the player's inventory or drops one when the inventory is full.
+- Keep existing contracts usable and available through creative inventory or administrator distribution.
+
+2026-10-07 22:05 — Preserve homes inside relocated city territory
+
+- Keep faction home coordinates unchanged when they remain inside the city's territory after its City Center is relocated. Only move homes that fall outside the rebuilt territory, retaining the existing translated-position and City Center fallback behavior.
+
+2026-10-09 02:46 — Feed grain mills through hopper-facing dummy blocks
+
+- Give grain mill multiblock dummies a server-side inventory proxy that forwards valid wheat insertion to the existing core inventory and marks the core dirty for saving. Core inventory NBT and the processing recipe remain unchanged.
+- Expose only the three wheat inputs above and at horizontal faces, and only the three flour outputs below the core. Dummy faces do not extract items. Hopper transfer and in-game processing still require runtime validation.
+
+2026-10-09 02:55 — Add stocked player trader shops
+
+- Add a craftable single-offer trader with UUID ownership, separately saved offer templates, sale stock, and collected payments. Owners and existing shop administrators can configure and manage storage; customers can purchase only complete offers.
+- Validate inventory capacity, exact item metadata/NBT, stock, and payment on the server before committing a purchase. Recheck faction interaction permission on every request and reject stale offer revisions. Runtime and in-game validation remain.
+
+2026-10-09 03:08 — Add configurable ender chest deposit restrictions
+
+- Add server-side blacklist or whitelist rules, portable storage denial, a total item cap, and per-item quantity limits using stable registry names and optional metadata. Default rules cover confirmed HBM bags, toolbox, storage crates, and safe; restrictions remain off by default.
+- Validate the resulting vanilla ender chest GUI contents after each click and restore both inventories and the cursor on rejection. Preserve existing ender chest NBT and withdrawal of saved contents. Direct third-party inventory mutation and in-game behavior still require runtime validation.
+
+2026-10-09 16:13 — Fix faction alliance offers and acceptance
+
+- Resolve alliance command targets by faction name first, then by player identity and current faction membership. Store new incoming offers by sending faction UUID, while recognizing existing saved offer keys where they can be resolved.
+- Accept only a matching incoming alliance offer, persist both alliance links, refresh nameplate relationships, and remove the matched offer after success. Show faction names in alliance messages and command suggestions. In-game validation remains.
+
+2026-10-09 16:47 — Harvest mature rice by right-clicking
+
+- Right-clicking rice at growth stage 7 now leaves the crop planted at stage 0 and drops one rice on the server. Immature rice and normal block-breaking drops are unchanged; faction and interaction cancellation continue through the existing event path. In-game validation remains.

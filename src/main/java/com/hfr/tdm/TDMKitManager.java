@@ -88,6 +88,12 @@ public class TDMKitManager {
     public static String[] getKitNames(String mapName, TDMManager.Team team) {
         return getKitNames(getTeamKits(mapName, team));
     }
+    public static String[] getKitNames(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode) {
+        return getKitNames(availableKits(mapName, team, mode));
+    }
+    public static int getKitCount(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode) {
+        return availableKits(mapName, team, mode).size();
+    }
 
     public static String[] getDirectKitNames(String mapName, TDMManager.Team team) {
         return getKitNames(getDirectTeamKits(mapName, team));
@@ -101,6 +107,12 @@ public class TDMKitManager {
         }
         return costs;
     }
+    public static int[] getKitCosts(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode) {
+        List<KitEntry> selected = availableKits(mapName, team, mode);
+        int[] costs = new int[selected.size()];
+        for (int i = 0; i < costs.length; i++) costs[i] = Math.max(0, selected.get(i).cost);
+        return costs;
+    }
 
     public static int getKitCost(String mapName, TDMManager.Team team, int index) {
         List<KitEntry> teamKits = getTeamKits(mapName, team);
@@ -109,13 +121,26 @@ public class TDMKitManager {
         }
         return Math.max(0, teamKits.get(index).cost);
     }
+    public static int getKitCost(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode, int index) {
+        List<KitEntry> selected = availableKits(mapName, team, mode);
+        return index < 0 || index >= selected.size() ? -1 : Math.max(0, selected.get(index).cost);
+    }
+    public static Object getAvailableKitIdentity(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode, int index) {
+        List<KitEntry> selected = availableKits(mapName, team, mode);
+        return index < 0 || index >= selected.size() ? null : selected.get(index);
+    }
 
     /**
      * Returns detached slot-indexed inventories for the same effective kit list used
      * by names, costs, and application. Callers may safely mutate the arrays or stacks.
      */
     public static ItemStack[][] getKitPreviews(String mapName, TDMManager.Team team) {
-        List<KitEntry> teamKits = getTeamKits(mapName, team);
+        return getKitPreviews(getTeamKits(mapName, team));
+    }
+    public static ItemStack[][] getKitPreviews(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode) {
+        return getKitPreviews(availableKits(mapName, team, mode));
+    }
+    private static ItemStack[][] getKitPreviews(List<KitEntry> teamKits) {
         ItemStack[][] previews = new ItemStack[teamKits.size()][MAIN_INVENTORY_SIZE + ARMOR_INVENTORY_SIZE];
 
         for (int kitIndex = 0; kitIndex < teamKits.size(); kitIndex++) {
@@ -155,12 +180,126 @@ public class TDMKitManager {
         return true;
     }
 
+    /** Direct definitions only: editing a map must never mutate its global fallback. */
+    public static String getDirectKitName(String mapName, TDMManager.Team team, int index) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        return index >= 0 && index < list.size() ? list.get(index).name : null;
+    }
+
+    public static int getDirectKitCost(String mapName, TDMManager.Team team, int index) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        return index >= 0 && index < list.size() ? list.get(index).cost : -1;
+    }
+    public static boolean isDirectKitDisabled(String mapName, TDMManager.Team team, int index, TDMManager.TDMGameMode mode) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        return index >= 0 && index < list.size() && list.get(index).disabledModes != null
+                && list.get(index).disabledModes.contains(mode.name());
+    }
+    public static boolean setDirectKitMode(String mapName, TDMManager.Team team, int index, TDMManager.TDMGameMode mode, boolean enabled) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        if (index < 0 || index >= list.size() || mode == null) return false;
+        KitEntry kit = list.get(index);
+        if (kit.disabledModes == null) kit.disabledModes = new ArrayList<String>();
+        kit.disabledModes.remove(mode.name());
+        if (!enabled) kit.disabledModes.add(mode.name());
+        save();
+        return true;
+    }
+
+    public static String getDirectKitRevision(String mapName, TDMManager.Team team, int index) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        return index >= 0 && index < list.size() ? GSON.toJson(list.get(index)) : null;
+    }
+
+    public static Object getDirectKitIdentity(String mapName, TDMManager.Team team, int index) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        return index >= 0 && index < list.size() ? list.get(index) : null;
+    }
+
+    public static ItemStack[] getDirectKitPreview(String mapName, TDMManager.Team team, int index) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        if (index < 0 || index >= list.size()) return null;
+        ItemStack[] preview = new ItemStack[MAIN_INVENTORY_SIZE + ARMOR_INVENTORY_SIZE];
+        if (list.get(index).items == null) return preview;
+        for (ItemEntry item : list.get(index).items) {
+            if (item == null || item.slot < 0 || item.slot >= preview.length) continue;
+            try { preview[item.slot] = item.toPreviewItemStack(); } catch (RuntimeException ignored) { }
+        }
+        return preview;
+    }
+
+    public static boolean canEditDirectKit(String mapName, TDMManager.Team team, int index) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        if (index < 0 || index >= list.size() || list.get(index).items == null) return false;
+        boolean[] used = new boolean[MAIN_INVENTORY_SIZE + ARMOR_INVENTORY_SIZE];
+        for (ItemEntry item : list.get(index).items) {
+            if (item == null || item.slot < 0 || item.slot >= used.length || used[item.slot]) return false;
+            used[item.slot] = true;
+            try { if (item.toPreviewItemStack() == null) return false; } catch (RuntimeException e) { return false; }
+        }
+        return true;
+    }
+
+    public static boolean replaceKit(String mapName, TDMManager.Team team, int index, Object identity, String revision, EntityPlayer player) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        if (revision == null || index < 0 || index >= list.size() || list.get(index) != identity || !revision.equals(GSON.toJson(list.get(index)))) return false;
+        KitEntry kit = list.get(index);
+        kit.items = captureItems(player);
+        save();
+        return true;
+    }
+
+    public static boolean renameKit(String mapName, TDMManager.Team team, int index, String name) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        if (index < 0 || index >= list.size() || name == null || name.trim().length() == 0 || name.length() > 64) return false;
+        list.get(index).name = name.trim();
+        save();
+        return true;
+    }
+
+    public static boolean setKitCost(String mapName, TDMManager.Team team, int index, int cost) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        if (index < 0 || index >= list.size() || cost < 0) return false;
+        list.get(index).cost = cost;
+        save();
+        return true;
+    }
+
+    public static boolean duplicateKit(String mapName, TDMManager.Team team, int index) {
+        List<KitEntry> list = getDirectTeamKits(mapName, team);
+        if (index < 0 || index >= list.size()) return false;
+        KitEntry source = list.get(index);
+        KitEntry copy = GSON.fromJson(GSON.toJson(source), KitEntry.class);
+        copy.name = source.name + " Copy";
+        list.add(copy);
+        save();
+        return true;
+    }
+
+    private static List<ItemEntry> captureItems(EntityPlayer player) {
+        List<ItemEntry> items = new ArrayList<ItemEntry>();
+        for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
+            ItemStack stack = player.inventory.mainInventory[i];
+            if (stack != null) items.add(new ItemEntry(i, stack));
+        }
+        for (int i = 0; i < ARMOR_INVENTORY_SIZE; i++) {
+            ItemStack stack = player.inventory.armorInventory[i];
+            if (stack != null) items.add(new ItemEntry(MAIN_INVENTORY_SIZE + i, stack));
+        }
+        return items;
+    }
+
     public static boolean applyKit(TDMManager.Team team, int kitIndex, EntityPlayer player) {
         return applyKit(GLOBAL_MAP, team, kitIndex, player);
     }
 
     public static boolean applyKit(String mapName, TDMManager.Team team, int kitIndex, EntityPlayer player) {
-        List<KitEntry> teamKits = getTeamKits(mapName, team);
+        return applyKit(getTeamKits(mapName, team), kitIndex, player);
+    }
+    public static boolean applyKit(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode, int kitIndex, EntityPlayer player) {
+        return applyKit(availableKits(mapName, team, mode), kitIndex, player);
+    }
+    private static boolean applyKit(List<KitEntry> teamKits, int kitIndex, EntityPlayer player) {
         if (kitIndex < 0 || kitIndex >= teamKits.size()) {
             return false;
         }
@@ -196,6 +335,12 @@ public class TDMKitManager {
         }
 
         return getDirectTeamKits(GLOBAL_MAP, team);
+    }
+    private static List<KitEntry> availableKits(String mapName, TDMManager.Team team, TDMManager.TDMGameMode mode) {
+        List<KitEntry> result = new ArrayList<KitEntry>();
+        for (KitEntry kit : getTeamKits(mapName, team))
+            if (kit.disabledModes == null || !kit.disabledModes.contains(mode.name())) result.add(kit);
+        return result;
     }
 
     private static List<KitEntry> getDirectTeamKits(String mapName, TDMManager.Team team) {
@@ -310,6 +455,8 @@ public class TDMKitManager {
     private static class KitEntry {
         String name;
         int cost;
+        /** Absent in legacy JSON, which means available in every mode. */
+        List<String> disabledModes;
         List<ItemEntry> items = new ArrayList<ItemEntry>();
 
         KitEntry() { }

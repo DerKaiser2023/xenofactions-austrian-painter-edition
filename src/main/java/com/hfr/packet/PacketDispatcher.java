@@ -117,6 +117,16 @@ public class PacketDispatcher {
 		wrapper.registerMessage(TDMSurvivorChoicePacket.Handler.class, TDMSurvivorChoicePacket.class, i++, Side.SERVER);
 		wrapper.registerMessage(TDMSoundPacket.Handler.class, TDMSoundPacket.class, i++, Side.CLIENT);
 		wrapper.registerMessage(ResearchOpenGuiPacket.Handler.class, ResearchOpenGuiPacket.class, i++, Side.CLIENT);
+		wrapper.registerMessage(AdminEditorSnapshotPacket.Handler.class, AdminEditorSnapshotPacket.class, i++, Side.CLIENT);
+		wrapper.registerMessage(AdminEditorActionPacket.Handler.class, AdminEditorActionPacket.class, i++, Side.SERVER);
+		wrapper.registerMessage(com.hfr.packet.client.AdminEditorNavigatePacket.Handler.class, com.hfr.packet.client.AdminEditorNavigatePacket.class, i++, Side.SERVER);
+		wrapper.registerMessage(AdminEditorClosePacket.Handler.class, AdminEditorClosePacket.class, i++, Side.CLIENT);
+		wrapper.registerMessage(AdminSelectionSyncPacket.Handler.class, AdminSelectionSyncPacket.class, i++, Side.CLIENT);
+		wrapper.registerMessage(TDMMapOverlayPacket.Handler.class, TDMMapOverlayPacket.class, i++, Side.CLIENT);
+        wrapper.registerMessage(com.hfr.packet.shop.XShopActionPacket.Handler.class, com.hfr.packet.shop.XShopActionPacket.class, i++, Side.SERVER);
+        wrapper.registerMessage(com.hfr.packet.shop.XShopSnapshotPacket.Handler.class, com.hfr.packet.shop.XShopSnapshotPacket.class, i++, Side.CLIENT);
+        wrapper.registerMessage(com.hfr.packet.shop.PlayerTraderActionPacket.Handler.class, com.hfr.packet.shop.PlayerTraderActionPacket.class, i++, Side.SERVER);
+        wrapper.registerMessage(com.hfr.packet.shop.PlayerTraderSnapshotPacket.Handler.class, com.hfr.packet.shop.PlayerTraderSnapshotPacket.class, i++, Side.CLIENT);
 
 	}
 	

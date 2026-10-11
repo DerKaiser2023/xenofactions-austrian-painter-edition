@@ -65,7 +65,9 @@ Usage: `/clowder help`; aliases: `/clowder`, `/c`; permission level: 0.
 | `/c city cancelmove` | Leader-only: cancel the pending relocation without changing the City Center or its claims. |
 | `/c city recovermove` | Leader-only: issue a replacement token for the active server-authorized relocation. |
 | `/c nameclaim <name>` | Name the current claim. |
-| `/c sethome` | Set faction home. |
+| `/c capital` | Show the designated capital and remaining change cooldown; separate from city upgrade level. |
+| `/c capital set <owned city>` | Leader-only: change the designated capital. Default cooldown between changes is seven days. |
+| `/c sethome` | Officer or leader: set faction home inside the designated capital only. |
 | `/c home` | Teleport to faction home. |
 | `/c setallywarp` | Set ally warp point. |
 | `/c allywarp <faction>` | Warp to an allied faction's ally warp. |
@@ -168,24 +170,42 @@ Usage: `/cc <message>`; permission level: 0.
 | `/stonedrop list` | Admin/moderator default | Administrator command to list configured custom stone drops. |
 | `/stonedrop remove <index>` | Admin/moderator default | Administrator command to remove a custom stone drop. |
 | `/xshop add <shop>` | Level 3 | Add a shop offer using hotbar slots: slot 1 sold item, next three slots currency. |
-| `/xshop delete <shop/index>` | Level 3 | Delete a shop offer. |
+| `/xshop create <name>` | Level 3 | Create an empty shop with a permanent ID. |
+| `/xshop delete <shop>` | Level 3 | Delete the shop; linked blocks become inactive. |
+| `/xshop rename <ID/name> <new name>` | Level 3 | Change the display name without breaking block links. |
+| `/xshop list [page]` | Level 3 | List shop names, IDs, offers, and eligibility settings. |
+| `/xshop edit <shop>` | Level 3 | Open the settings and offer editor. |
+| `/xshop set <ID/name> <enabled\|visible\|adminOnly> <on\|off>` | Level 3 | Control shop access and faction-market availability. |
+| `/xshop link <ID/name> <x> <y> <z>` | Level 3 | Link a loaded admin shop block in your dimension. |
+| `/xshop unlink <x> <y> <z>` | Level 3 | Unlink a loaded admin shop block in your dimension. |
+| `/xshop removeoffer <ID/name> <index>` | Level 3 | Remove a zero-based offer. Legacy `/xshop delete <index> <shop>` also remains supported. |
 | `/xmarket setstock ...` | Level 3 | Admin stock market control. |
 | `/xmarket triggerstock ...` | Level 3 | Trigger stock movement/events. |
 | `/xmarket setshares ...` | Level 3 | Set player stock shares. |
 | `/xmarket getshares ...` | Level 3 | Inspect player stock shares. |
 | `/xplayer <cbt\|ramranch\|fps\|tilt\|shader\|vomit> <player>` | Level 3 | Toggle low-FPS, screen-tilt, or rapidly alternating shader effects for a player. |
 
+XShop commands also have the `/shop` alias. Use a stable ID from `/xshop list` for names containing spaces in commands with additional arguments. Creation, deletion, editing, and adding offers accept a complete name as their trailing argument. Tab completion offers configured IDs and single-word names, settings, boolean values, offer indices, list pages, and block coordinates. Catalog-management commands work from the console; GUI, hotbar, and block-link operations require a player.
+
 ## Optional TDM: `/tdm`
 
 Registered only when `enableTDM=true`. `/tdm help [category]` provides paged, permission-aware help. Player pages are `general`, `match`, and `teams`; operators additionally see `kits`, `maps`, and `admin`. Tab completion is server-authoritative for online players and configured maps, and covers command names, subcommands, teams, modes, map settings, and other fixed values.
 
-Player commands are `/tdm menu`, `/tdm maps`, `/tdm vote <map>`, `/tdm skip [yes|no|status]`, and `/tdm teamchange`. Setup and match-control commands remain operator-only and are not suggested to ordinary players. Use the categorized help pages for exact required/optional arguments and examples.
+Player commands are `/tdm menu`, `/tdm maps`, `/tdm overlay <on|off>`, `/tdm vote <map> <tdm|sd|ffa>`, `/tdm skip [yes|no|status]`, and `/tdm teamchange`. The vote GUI shows each enabled map and mode pairing separately; an omitted vote mode uses that map's default for compatibility. Setup and match-control commands remain operator-only and are not suggested to ordinary players. Use the categorized help pages for exact required/optional arguments and examples.
 
-Deathmatch and FFA are continuous modes: login and respawn place a player immediately at a mode-appropriate spawn and open a protected respawn-loadout selector. That selector ignores kit prices, buy score, survivor kits, and BOMB buy timing. FFA loadouts may be selected from either configured RED or BLUE kit pool, but FFA does not assign a team. Competitive BOMB alone owns economy and survivor-kit state; active hardcore BOMB late joiners retain the established round-waiting behavior.
+The selected map's enabled border appears automatically for all players in its dimension, including before a match starts, on JourneyMap or on the standalone HUD map when JourneyMap is unavailable. Search and Destroy sites appear while that pairing is active in a running match. `/tdm overlay` controls extra permitted map details and does not hide those public shapes; the editor no longer has a Map overlay button. Right Alt toggles in-world border effects and the standalone fallback map, but never JourneyMap shapes; its key can be changed in Controls.
+
+Administrators can open `/tdm editor gui` or press F10 (configurable in Controls) for the draggable map, kit, spawn, area, and settings panel. Reopening restores that administrator's last editing context independently of the active match; `/tdm editor gui <map> <team> <kit>` selects a specific target. The Maps page enables voting modes separately. The Spawns page edits one mode's spawn set at a time. The Kits page previews the selected direct kit, can create from the current inventory, clone, rename, set Search and Destroy buy score, restrict modes, or load it into creative inventory for natural slot editing. After loading, use `/tdm kit commit` or `/tdm kit cancel` (also available in the panel). The original inventory is restored in both cases. Use the Map/Global control to inspect global fallback kits; a map kit edit never silently changes its fallback. Existing `/tdm kit add`, `list`, and `remove` commands still work.
+
+The Areas page starts a typed selection and gives an Admin Selection Wand when there is inventory room. Close the panel with `Use wand`, left-click a block for A, right-click a block for B, then reopen with F10 to inspect or commit. Air clicks do not set a point. `/tdm editor select <map|bomb_a|bomb_b> [map]`, `/tdm editor point <a|b>`, `/tdm editor commit`, and `/tdm editor cancel` are chat equivalents. Map bounds do not create a claim. `/tdm map border <map> <on|off>` optionally keeps active match players inside their horizontal footprint; it is off by default. `/xc editor select <safezone|warzone|wilderness|border_exempt>` uses the same point/commit/cancel flow for Clowder zones and border exemptions. The preview shows nearby safe and war chunks separately from map bounds and Search and Destroy sites. `/xc setclaim` remains available for the radius workflow.
+
+Map spawn commands are `/tdm map addspawn <map> <red|blue|ffa> [mode]`, `/tdm map updatespawn <map> <number> [mode]`, `/tdm map tpspawn <map> <number> [mode]`, `/tdm map removespawn <map> <number> [mode]`, and `/tdm map clearspawns <map> [mode]`. An omitted mode uses the map default. FFA accepts neutral spawns; TDM and Search and Destroy accept team spawns. Adding or updating a map spawn records the administrator's position and facing; older spawns keep their previous facing behavior. `/tdm map clearbounds <map>` removes optional map preview bounds.
+
+Deathmatch and FFA are continuous modes: login and respawn place a player immediately at a mode-appropriate spawn and open a protected respawn-loadout selector. That selector ignores kit prices, buy score, survivor kits, and Search and Destroy buy timing. FFA loadouts may be selected from either configured RED or BLUE kit pool, but FFA does not assign a team. Competitive Search and Destroy alone owns economy and survivor-kit state; active hardcore Search and Destroy late joiners retain the established round-waiting behavior.
 
 `/tdm skip [yes|no|status]` starts or participates in a vote to skip the current map. Player messages identify the purpose of the vote, show the YES threshold, and announce whether the map will be skipped, the vote failed, or it expired.
 
-Map-specific spawns are authoritative, including their configured dimensions. Legacy global spawns are used only when the selected map has no map-specific spawn data. A match with missing required spawns is refused and logged rather than falling through to vanilla worldspawn. Mode changes stop the old lifecycle and clear pending kit, protection, waiting, elimination, objective, and survivor state before starting the new mode.
+Map and mode spawn sets are authoritative, including their configured dimensions. An empty set does not borrow another mode's spawns unless `/tdm map spawnfallback <map> <mode> <source-mode|none>` explicitly configures that sharing. Legacy global spawns remain a fallback only for a map's original default mode. A match with missing required spawns is refused and logged rather than falling through to vanilla worldspawn. Mode changes stop the old lifecycle and clear pending kit, protection, waiting, elimination, objective, and survivor state before starting the new mode.
 
 ## Registered-but-not-currently-registered commands
 
@@ -194,13 +214,15 @@ The source contains `CommandOrewand`, `CommandXCum`, and `CommandXCustomImage`, 
 
 TDM always stores players on the **RED** or **BLUE** team. A bomb map adds objective roles without changing membership: `/tdm map terroristteam <map> <red|blue>` chooses which stored team is Terrorist and the other team is Counter-Terrorist. Sides do not swap automatically.
 
-Use `/tdm map mode <map> <deathmatch|bomb|ffa>` to select the mode. `/tdm map hardcorerespawns <map> <true|false>` is BOMB-only: `true` uses competitive elimination and the timed buy phase, while `false` permits BOMB respawns and opens protected competitive kit selection after each respawn without a buy timer. Deathmatch and FFA reject this setting because both are continuous. Configure A or B as normalized cuboids with `/tdm map bombsite <map> <a|b> pos1`, `pos2`, or `clear`; positions use the executing player's floored block coordinate and both corners must share a dimension.
+Use `/tdm map mode <map> <tdm|sd|ffa>` to set the default mode, `/tdm map voteable <map> <on|off>` to include or exclude every mode of a map from votes, `/tdm map voteable <map> <tdm|sd|ffa> <on|off>` to configure individual mode offerings, and `/tdm map select <map> [mode]` to start a specific pairing. Newly created maps begin with map voting off; existing saved maps retain voting. Internally, Search and Destroy keeps the save ID `BOMB`; `sd` is its command alias. `/tdm map hardcorerespawns <map> <true|false>` applies to Search and Destroy: `true` uses competitive elimination and the timed buy phase, while `false` permits respawns and opens protected competitive kit selection after each respawn without a buy timer. TDM and FFA remain continuous. Configure A or B as normalized cuboids with `/tdm map bombsite <map> <a|b> pos1`, `pos2`, or `clear`; positions use the executing player's floored block coordinate and both corners must share a dimension. The two corner commands use the shared typed selection and save together when both are set; an existing site remains active until then.
+
+Use `/tdm kit mode <red|blue> <number> <map|global> <tdm|sd|ffa> <on|off>` to restrict one saved kit without copying it. Old kits default to every mode. The saved kit cost applies only in Search and Destroy; TDM and FFA ignore it. On legacy save migration, neutral map spawns enter the FFA set and team spawns enter the former team mode. Ambiguous team spawns from an FFA map remain preserved: inspect them with `/tdm map legacyspawns <map>` and assign each with `/tdm map assignlegacyspawn <map> <number> <tdm|sd>`.
 
 `/tdm map lossscore <map> <amount>` configures the end-of-round losing-side bonus, while `/tdm map plantscore <map> <amount>` configures the individual successful-plant reward; both default to **1** and accept zero to disable the reward. Map listings show loss, kill, win, plant, and defuse economy values.
 
 `/tdm map scorelimit` and `/tdm map timer` retain their deathmatch meanings on deathmatch maps. On bomb maps they configure wins required (default **13**) and the pre-plant round timer (default **120 seconds**) using separate persisted overrides. `/tdm maps` shows roles, hardcore behavior, effective defaults, and bombsite readiness.
 
-HBM remains optional for Xenofactions and ordinary deathmatch. Playing a BOMB map requires HBM's exact runtime block registration `hbm:tile.charge_c4csgo` (with legacy `hbm:charge_c4csgo` fallback); no HBM classes are compile-time dependencies. After buy-time kit setup, each live round gives one CSGO charge to a random active player on the map's configured Terrorist team. The narrow PR #195 Warzone exception remains in effect outside controlled bomb rounds.
+HBM remains optional for Xenofactions and ordinary deathmatch. Playing a Search and Destroy pairing requires HBM's exact runtime block registration `hbm:tile.charge_c4csgo` (with legacy `hbm:charge_c4csgo` fallback); no HBM classes are compile-time dependencies. After buy-time kit setup, each live round gives one CSGO charge to a random active player on the map's configured Terrorist team. The narrow PR #195 Warzone exception remains in effect outside controlled bomb rounds.
 
 ### Earth boundary (`/xc worldborder`)
 
@@ -209,11 +231,11 @@ HBM remains optional for Xenofactions and ordinary deathmatch. Playing a BOMB ma
 | `/xc worldborder on` | Persistently enable the existing Earth boundary. |
 | `/xc worldborder off` | Persistently disable the existing Earth boundary. |
 | `/xc worldborder status` | Show effective state, geometry, safety margin, and exemption count. |
-| `/xc worldborder wand` | Give an in-game admin the selection wand (left-click position 1; right-click position 2). |
+| `/xc worldborder wand` | Start an exemption selection when idle and give the shared Admin Selection Wand if needed (left-click A; right-click B). |
 | `/xc worldborder exempt` | Persist the selected inclusive, all-Y rectangle. |
 | `/xc worldborder clearexemptions` | Remove every saved exemption without changing border state or geometry. |
 
-All commands require current `/xc` operator authorization. The console may use on, off, status, and clearexemptions; wand and exempt require an in-game administrator. Create an exemption with `/xc worldborder wand`, left-click position 1, right-click position 2, then `/xc worldborder exempt`. Exemptions persist automatically and bypass only Earth boundary enforcement. Players who leave an out-of-map exemption are returned safely to the configured Earth map center; ordinary non-exempt crossings retain the existing wrap behavior. For a world without runtime saved data, the configured `earthBoundaryEnabled` value is used.
+All commands require current `/xc` operator authorization. The console may use on, off, status, and clearexemptions; wand and exempt require an in-game administrator. Create an exemption with `/xc worldborder wand`, left-click position 1, right-click position 2, then `/xc worldborder exempt`. Exemptions persist automatically and bypass only Earth boundary enforcement in dimension 0. Selected blocks cover their full footprint, including the final block column. Boundary decisions use entity footprints and observed movement intersections before computing a wrap destination. A selected section touching a boundary stays open outward perpendicular to that boundary, within the selected span along its edge; this prevents a fast entity from being wrapped after overshooting a thin selection. Players leaving that span outside the map are returned safely to the configured Earth map center; ordinary non-exempt crossings retain the existing wrap behavior. For a world without runtime saved data, the configured `earthBoundaryEnabled` value is used.
 # TDM observer administration
 
 `/tdm teamless` is an operator-level command which removes the executing player
@@ -221,6 +243,8 @@ from both competitive teams. Use `/tdm setteam <player> <red|blue>` to return th
 observer to play.
 
 ### FFA and economy map settings
+
+FFA uses only neutral spawns from the selected map's FFA spawn set. It has no active RED or BLUE teams: automatic and manual team balancing do nothing, `/tdm setteam` is unavailable, and team lookups return no team while FFA is selected. Prior team assignments remain saved for a later team mode.
 
 - `/tdm map mode <map> <deathmatch|bomb|ffa>`
 - `/tdm map addspawn <map> <red|blue|ffa>`
@@ -236,17 +260,17 @@ Reward amounts must be non-negative; zero disables that reward. FFA competitors 
 
 ## TDM score and purchase commands
 
-TDM keeps three unrelated score domains: BOMB **buy score** is money, optional **kill score** buys killstreak rewards, and non-spendable **point score** decides DEATHMATCH/FFA victory. Normal DEATHMATCH/FFA kits remain economy-free.
+TDM keeps three unrelated score domains: Search and Destroy **buy score** is money, optional **kill score** buys killstreak rewards, and non-spendable **point score** decides DEATHMATCH/FFA victory. Normal DEATHMATCH/FFA kits remain economy-free.
 
 Player commands:
-- `/tdm menu` opens the mode-aware scoreboard/loadout menu. BOMB buy time exposes Utility; configured DEATHMATCH/FFA maps expose Killstreaks and the player's kill-score balance.
-- `/tdm utility list` and `/tdm utility buy <number>` list or buy BOMB utility with buy score.
+- `/tdm menu` opens the mode-aware scoreboard/loadout menu. Search and Destroy buy time exposes Utility; configured DEATHMATCH/FFA maps expose Killstreaks and the player's kill-score balance.
+- `/tdm utility list` and `/tdm utility buy <number>` list or buy Search and Destroy utility with buy score.
 - `/tdm killstreak list` and `/tdm killstreak buy <number>` list or queue a respawn reward using kill score.
 
 Administrator commands:
 - `/tdm utility <list|add|remove> [map|global] [cost|number]` captures additive utility definitions from the administrator's inventory.
 - `/tdm killstreak <list|add|remove> [map|global] [cost|number]` captures queued killstreak definitions from the administrator's inventory.
-- `/tdm map pointlimit <map> <points|default>` sets the non-BOMB victory threshold (`scorelimit` remains an alias).
+- `/tdm map pointlimit <map> <points|default>` sets the non-Search-and-Destroy victory threshold (`scorelimit` remains an alias).
 - `/tdm map killstreaks <map> <true|false>` explicitly enables killstreaks on DEATHMATCH/FFA maps.
 - `/tdm map killscorereward <map> <amount>` sets spendable kill score awarded per valid kill.
 

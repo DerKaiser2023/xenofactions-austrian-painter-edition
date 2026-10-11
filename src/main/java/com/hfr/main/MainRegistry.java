@@ -448,6 +448,9 @@ public class MainRegistry
 		FluidHandler.init();
 		HFRPotion.init();
 		MainRegistry.loadCustomDrops();
+		com.hfr.tdm.AdminEditorLifecycle adminEditorLifecycle = new com.hfr.tdm.AdminEditorLifecycle();
+		MinecraftForge.EVENT_BUS.register(adminEditorLifecycle);
+		FMLCommonHandler.instance().bus().register(adminEditorLifecycle);
 		if(XFConfig.enableTDM) {
 			TDMManager.init();
 			TDMHandler tdmHandler = new TDMHandler();
@@ -665,6 +668,7 @@ public class MainRegistry
 		GameRegistry.registerTileEntity(TileEntityProp.class, "tileentity_hfr_prop");
 		GameRegistry.registerTileEntity(TileEntityStatue.class, "tileentity_hfr_statue");
 		GameRegistry.registerTileEntity(TileEntityMachineGrainmill.class, "tileentity_hfr_mill");
+		GameRegistry.registerTileEntity(TileEntityGrainmillInputProxy.class, "tileentity_hfr_mill_input_proxy");
 		GameRegistry.registerTileEntity(TileEntityMachineBlastFurnace.class, "tileentity_hfr_furnace");
 		GameRegistry.registerTileEntity(TileEntityBerlin.class, "tileentity_hfr_berlin");
 		GameRegistry.registerTileEntity(TileEntityBox.class, "tileentity_hfr_smelly_box");
@@ -686,6 +690,7 @@ public class MainRegistry
 		GameRegistry.registerTileEntity(TileEntityConquerer.class, "tileentity_hfr_conquest_flag");
 		GameRegistry.registerTileEntity(TileEntityOfficerChest.class, "tileentity_hfr_chest");
 		GameRegistry.registerTileEntity(TileEntityMarket.class, "tileentity_hfr_shop");
+		GameRegistry.registerTileEntity(com.hfr.blocks.machine.PlayerTrader.Tile.class, "tileentity_hfr_player_trader");
 		GameRegistry.registerTileEntity(TileEntityFoundry.class, "tileentity_hfr_foundry");
 		GameRegistry.registerTileEntity(TileEntityMachineSawmill.class, "tileentity_hfr_sawmill");
 		GameRegistry.registerTileEntity(TileEntityMachineEFurnace.class, "tileentity_hfr_efurnace");
@@ -757,11 +762,14 @@ public class MainRegistry
 		FMLCommonHandler.instance().bus().register(claimOverlaySync);
 		FMLCommonHandler.instance().bus().register(new StoneDropSnapshotSync());
 		FMLCommonHandler.instance().bus().register(new MachineDisplaySnapshotSync());
-		if(XFConfig.enableDynmapIntegration)
+		if(XFConfig.enableDynmapIntegration) {
 			FMLCommonHandler.instance().bus().register(dynmap);
+			MinecraftForge.EVENT_BUS.register(dynmap);
+		}
 		//FMLCommonHandler.instance().bus().register(pon4);
 		MinecraftForge.EVENT_BUS.register(handler);
 		MinecraftForge.EVENT_BUS.register(clowder);
+		MinecraftForge.EVENT_BUS.register(new com.hfr.ender.EnderChestInteraction());
 		//MinecraftForge.EVENT_BUS.register(pon4);
 
 		//GameRegistry.registerWorldGenerator(worldGenMoon, 0);
@@ -817,6 +825,7 @@ public class MainRegistry
 
 	@Mod.EventHandler
 	public void postInit(FMLPostInitializationEvent event) {
+		com.hfr.ender.EnderChestRestrictions.validateRegistry();
 		///give RagexPrince683 mcheli:item.ingot_steel
 		Item steelIngot = GameRegistry.findItem("mcheli", "item.ingot_steel");
 		if (steelIngot != null) {

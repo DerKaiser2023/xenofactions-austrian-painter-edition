@@ -9,6 +9,8 @@ import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
+import net.minecraftforge.oredict.OreDictionary;
+import net.minecraftforge.oredict.ShapedOreRecipe;
 
 /** Survival entry points for the established faction, prestige, and support loop. */
 public final class XenoRecipes {
@@ -19,6 +21,21 @@ public final class XenoRecipes {
 	public static void registerSurvivalRecipes() {
 		if(!XFConfig.enableSurvivalRecipes)
 			return;
+
+		// Fortifications: placement metadata is orientation/dummy state, not an item variant.
+		GameRegistry.addRecipe(new ShapedOreRecipe(new ItemStack(ModBlocks.barricade, 4),
+				" S ", "SWS", " S ", 'S', new ItemStack(Blocks.sand, 1, OreDictionary.WILDCARD_VALUE),
+				'W', new ItemStack(Blocks.wool, 1, OreDictionary.WILDCARD_VALUE)));
+		GameRegistry.addRecipe(new ShapedOreRecipe(new ItemStack(ModBlocks.hesco_block, 2),
+				"BSB", "ISI", "BSB", 'B', Blocks.iron_bars, 'S', ModBlocks.barricade, 'I', "ingotIron"));
+		GameRegistry.addRecipe(new ShapedOreRecipe(new ItemStack(ModBlocks.stone_wall, 4),
+				"S S", "S S", "S S", 'S', "cobblestone"));
+		GameRegistry.addRecipe(new ItemStack(ModBlocks.brick_wall, 4), "BBB", "BBB", 'B', Blocks.brick_block);
+		GameRegistry.addRecipe(new ItemStack(ModBlocks.great_wall, 4), "SSS", "SSS", 'S', Blocks.stonebrick);
+		GameRegistry.addRecipe(new ShapedOreRecipe(new ItemStack(ModBlocks.palisade, 4),
+				"LLL", "SSS", "LLL", 'L', "logWood", 'S', Items.stick));
+		GameRegistry.addRecipe(new ItemStack(ModBlocks.berlin_wall, 2), "SBS", "SBS", "SBS",
+				'S', Blocks.stone, 'B', Blocks.iron_bars);
 
 		// Founding and war: costly enough to matter, but replaceable after conflict.
 
@@ -41,6 +58,11 @@ public final class XenoRecipes {
 
 
 		// Faction utilities.
+        shaped(ModBlocks.faction_market, "IRI", "ECE", "IRI", 'I', Items.iron_ingot,
+            'R', Items.redstone, 'E', Items.emerald, 'C', Blocks.chest);
+        //shaped(ModBlocks.player_trader, "IRI", "ECE", "IRI", 'I', Items.iron_ingot,
+        //    'R', Items.redstone, 'E', Items.emerald, 'C', Blocks.trapped_chest);
+		//DEBUG
 		// Four foundations per craft keeps large footprints practical while still requiring ironwork.
 		GameRegistry.addRecipe(new ItemStack(ModBlocks.uni_foundation, 4), "SIS", "III", "SIS",
 				'S', Blocks.stonebrick, 'I', Items.iron_ingot);
@@ -52,7 +74,7 @@ public final class XenoRecipes {
 
 		// Developed production/prestige infrastructure; shared components form the progression chain.
 		shaped(ModBlocks.machine_coalmine, "SMS", "MCM", "SIS", 'S', ModItems.components_scaffold,
-				'M', ModItems.components_mechanical, 'C', Blocks.chest, 'I', Items.minecart);
+				'M', ModItems.components_mechanical, 'C', Blocks.chest, 'I', Blocks.iron_block);
 		shaped(ModBlocks.machine_factory, "SCS", "MEM", "SPS", 'S', ModItems.components_steel,
 				'C', Blocks.crafting_table, 'M', ModItems.components_mechanical, 'E', ModItems.components_electronics, 'P', Blocks.piston);
 		shaped(ModBlocks.machine_uni, "BEB", "SDS", "BKB", 'B', Blocks.bookshelf, 'E', Blocks.beacon,

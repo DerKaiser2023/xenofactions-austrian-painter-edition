@@ -22,9 +22,9 @@ Category: `XENOFACTIONS_01_MODULES`
 
 | Key | Default | Meaning |
 | --- | ---: | --- |
-| `enableSurvivalRecipes` | `true` | Register the audited survival recipes for faction, prestige, production, and support infrastructure. Set `false` to preserve command/shop-only distribution; registrations and unrelated recipes are unchanged. |
+| `enableSurvivalRecipes` | `true` | Register the audited survival recipes for faction, prestige, production, support infrastructure, and the fortifications listed in [survival recipes](survival-recipes.md). Set `false` to omit these optional recipes; registrations, legacy sandbag recipes, and unrelated recipes are unchanged. |
 | `enableDynmapIntegration` | `true` | Try to publish faction city/claim markers through Dynmap when Dynmap is installed. |
-| `enableJourneyMapIntegration` | `true` | Enable optional client claim overlays for legacy JourneyMap 5.2.x on Minecraft 1.7.10. |
+| `enableJourneyMapIntegration` | `true` | Enable optional client overlays for JourneyMap 6.0.x on Minecraft 1.7.10; the 5.2.x hook remains available. |
 | `enableTDM` | `true` | Register and initialize the optional team-deathmatch module. |
 | `enableCustomFactionFlags` | `true` | Allow `/c flag seturl`, `clear`, and `reload` custom flag workflows. |
 | `enableNewPlayerProtection` | `false` | Enable starter protection systems. |
@@ -111,6 +111,7 @@ Category: `XENOFACTIONS_05_CLAIMS_CITIES`
 | `cityRelocationMoveLimit` | `3` | Successful moves allowed per stable city ID in the rolling window. |
 | `cityRelocationWindowHours` | `168` | Rolling move-frequency window (seven days). |
 | `cityRelocationRepeatCooldownMinutes` | `30` | Delay after the second successful move before the third move. |
+| `capitalChangeCooldownHours` | `168` | Hours between leader-only designated-capital changes, independent of city level. Minimum 1 hour. |
 | `cityRelocationPendingMinutes` | `30` | Pending transaction lifetime; expiration leaves the old city unchanged. |
 | `warpCost` | `125` | Legacy alias still read in this category. |
 | `territoryDelay` | `5` | Ticks between territory validation operations. |
@@ -147,6 +148,41 @@ Category: `XENOFACTIONS_07_NEW_PLAYER_PROTECTION`
 | `graceBuildEnabled` | `true` | Enable faction build grace. |
 | `graceBuildOneTimeUse` | `true` | Restrict build grace to one use. |
 | `graceBuildDurationHours` | `48` | Build grace duration. |
+
+## Ender chest restrictions
+
+Category: `XENOFACTIONS_21_ENDER_CHEST`. These rules are enforced by the server when a player opens a vanilla ender chest block. They are disabled by default, so existing behavior remains unchanged until `enabled=true`. Configuration changes require a server restart.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `false` | Enable deposit checks. |
+| `mode` | `blacklist` | `blacklist` rejects `itemRules`; `whitelist` accepts only `itemRules`. |
+| `itemRules` | empty | Registry names, optionally followed by `@metadata`. |
+| `storageDenyList` | HBM portable storage listed below | Always denied, even in whitelist mode. |
+| `maxTotalItems` | `-1` | Maximum sum of stack sizes across all 27 slots. `-1` is unlimited and `0` prevents deposits. |
+| `itemQuantityLimits` | empty | Entries of `registry_name[@metadata]=quantity`, counted across all ender chest slots. `-1` is unlimited and `0` prevents deposits. |
+
+Example Forge configuration entries (retain the generated `storageDenyList` to keep the HBM defaults):
+
+```cfg
+XENOFACTIONS_21_ENDER_CHEST {
+    B:enabled=true
+    S:mode=blacklist
+    S:itemRules <
+        minecraft:diamond
+    >
+    S:maxTotalItems=128
+    S:itemQuantityLimits <
+        minecraft:wool@14=16
+    >
+}
+```
+
+For example, Forge list values can include `minecraft:diamond`, `minecraft:wool@14`, and `minecraft:diamond=16` in `itemQuantityLimits`. Names are exact registry names, including the mod prefix; translated names and numeric IDs are not accepted. An entry without `@metadata` matches every metadata value. When both a general and metadata-specific limit match, both limits apply. The storage deny list takes priority over whitelist entries, followed by item rules and quantity limits. Limits count outer item stacks only; they never decode the contents of bags or crates.
+
+The default `storageDenyList` covers confirmed HBM registry items `hbm:item.plastic_bag`, `hbm:item.containment_box`, `hbm:item.kit_toolbox`, `hbm:item.kit_custom`, and the carried-content block items `hbm:tile.crate_iron`, `hbm:tile.crate_steel`, `hbm:tile.crate_desh`, `hbm:tile.crate_tungsten`, `hbm:tile.crate_template`, and `hbm:tile.safe`. HBM's bags and kits store contents in item NBT; its storage crates and safe write slot NBT to the dropped block item. Their empty and filled forms have the same registry names, so both are blocked. XenoFactions' `hfr:item.crate` is a plain lore item, and the inspected HBM loot crates generate drops rather than carry inventory NBT; neither is on the default storage list. Other modpack portable storage items could not be confirmed from the available source and must be added by their verified registry names.
+
+Saved contents are retained when these settings change. Players may withdraw items that now violate rules and may move contents without increasing restricted quantities. A rejected GUI deposit restores the ender chest, player inventory, and cursor, then sends a reason and a fresh inventory update. The default protection covers vanilla ender chest block interactions; integrations that directly mutate `EntityPlayer.getInventoryEnderChest()` or open their own container are outside this GUI interception path.
 
 ## Custom flags
 
@@ -204,10 +240,18 @@ Category: `XENOFACTIONS_09_DYNMAP`
 | `showCityCenterMarkers` | `true` | Show a point marker at each city center. |
 | `showClaimDetailsInLabels` | `true` | Include claim details in Dynmap labels. |
 | `showPrestigeDetailsInLabels` | `true` | Include prestige/upkeep details in labels. |
+| `showTdmSpawns` | `false` | Publish exact active TDM map spawn positions to the public Dynmap web map. |
+| `dynmapDimensionWorldMap` | `0=auto`, `-1=auto`, `1=auto` | Resolve GTNH/Dynmap's actual Forge world IDs, or supply explicit dimension-to-world overrides. |
+
+Dynmap publishes city claims in the configured city set, other faction claims in `xenofactions_claims`, SAFEZONE/WARZONE territories in `xenofactions_zones`, and the enabled active TDM map's bounds and Search and Destroy sites in `xenofactions_tdm`. Sites appear only when the selected pairing is Search and Destroy; optional spawn markers come only from the active mode's spawn set. Other maps and world-border exemptions are not published to the public web map. Each published dimension needs a valid `dynmapDimensionWorldMap` entry. These are separate Xenofactions-owned marker sets; third-party markers are not modified. Marker updates are bounded by `updateIntervalTicks` (default 30 seconds). Territory geometry uses Clowder's saved coordinate bounds, including its legacy negative-coordinate behavior.
+
+Use `0=auto` for the overworld. Automatic resolution calls the installed mod's `ForgeWorld.getWorldName(World)` and `DynmapWorld.normalizeWorldName(String)`, so it follows GTNH's configured naming mode rather than guessing a dimension, provider, or save-folder name. The old stock entries `0=world`, `-1=world_nether`, and `1=world_the_end` also resolve automatically in existing configs; other explicit IDs remain overrides. For the custom overworld `earth_1-4000_xenofactions_1.7.10_earth4000nopop`, an explicit entry is `0=earth_1-4000_xenofactions_1.7.10_earth4000nopop`. Use the world ID from the web configuration, not its display title. Missing or empty dimension entries still suppress publication. Automatic entries wait for that dimension to load; server world load/unload events trigger a rebuild at the next refresh.
+
+GTNH publishes set labels even when a world's marker geometry is empty. Visible layer names therefore do not prove the geometry belongs to the active world. Its browser loads `_markers_/marker_<world-id>.json` relative to the configured marker URL; inspect `sets.<set-id>.areas`, `.lines`, and `.markers` for geometry. GTNH 0.3.47 filters this JSON using the marker's raw world ID, while newer source uses its normalized ID. Xenofactions supplies the normalized ID to both, preserving publication for names containing `/`, `[` or `]`. Nonpersistent markers are still included in web JSON and updates; persistence only controls marker save/reload.
 
 ## JourneyMap client overlay
 
-JourneyMap is optional. Xenofactions targets the legacy JourneyMap 5.2.x implementation for Minecraft 1.7.10 (especially 5.2.8) through reflection; it does not use the modern JourneyMap API and has no JourneyMap dependency. Missing or changed JourneyMap internals disable only this overlay for the client session.
+JourneyMap is optional. JourneyMap 6.0.x uses its client API 2.0.0 plugin to show faction claims and zones, plus the selected map boundary when enforcement is enabled and both sites during a running Search and Destroy pairing. The enabled selected-map boundary is visible to all players in its dimension even before a match starts and without `/tdm overlay on`, including administrators. The optional overlay preference adds only the active gamemode's applicable spawn markers and nearby zone details. The API is compile-only and is not bundled into Xenofactions or required on the server. The 5.2.x reflection hook remains for older clients. When JourneyMap is unavailable or cannot accept polygons, the same public shapes appear on the standalone HUD map. Right Alt, configurable in Controls, toggles in-world border effects and the standalone HUD map and defaults on; it never hides JourneyMap shapes or changes server-side enforcement.
 
 Category: `XENOFACTIONS_09B_JOURNEYMAP_CLIENT`
 
@@ -328,7 +372,7 @@ later loads and reloads preserve the empty list.
 
 ## TDM FFA and economy
 
-`/tdm map mode <map> ffa` selects round-elimination Free-For-All. Add neutral spawn locations with `/tdm map addspawn <map> ffa`; these are stored independently from RED/BLUE spawns. Existing map saves remain valid and maps without FFA spawn records retain their team-mode behavior.
+`/tdm map mode <map> ffa` sets the legacy default to round-elimination Free-For-All; `/tdm map voteable <map> ffa on` can add it as another pairing while keeping the same physical map. Add neutral spawn locations with `/tdm map addspawn <map> ffa ffa`; these are stored in the FFA set, independently from the TDM and Search and Destroy team sets. Existing map saves are migrated to the former default mode. An empty FFA set never borrows team spawns unless an explicit spawn fallback is configured.
 
 TDM maps persist non-negative economy rewards. Missing fields use these defaults:
 
@@ -344,6 +388,6 @@ The values name sound **events**, not `.ogg` files or paths. An ID without a nam
 
 ## TDM map scoring and purchases
 
-Non-BOMB maps can override their point-score victory threshold with `/tdm map pointlimit`; the existing timer remains an independent ending condition. DEATHMATCH stores team point scores and FFA stores per-player point scores. Both reset at a new match/map and are never spendable.
+Non-Search-and-Destroy maps can override their point-score victory threshold with `/tdm map pointlimit`; the existing timer remains an independent ending condition. DEATHMATCH stores team point scores and FFA stores per-player point scores. Both reset at a new match/map and are never spendable.
 
-Killstreak support is opt-in per DEATHMATCH/FFA map (`killstreaks`, default `false`), with one kill-score unit awarded for each server-validated enemy kill by default. Unspent kill score persists through deaths but resets at a new match/map. Purchased rewards are queued and assembled after the next kit so kit reconstruction cannot erase them. Utility and killstreak definitions persist in the world save's `tdm_purchasables.txt`; utility costs use BOMB buy score, while killstreak costs use only kill score.
+Killstreak support is opt-in per DEATHMATCH/FFA map (`killstreaks`, default `false`), with one kill-score unit awarded for each server-validated enemy kill by default. Unspent kill score persists through deaths but resets at a new match/map. Purchased rewards are queued and assembled after the next kit so kit reconstruction cannot erase them. Utility and killstreak definitions persist in the world save's `tdm_purchasables.txt`; utility costs use Search and Destroy buy score, while killstreak costs use only kill score.

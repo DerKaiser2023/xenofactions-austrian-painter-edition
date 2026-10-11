@@ -1,6 +1,10 @@
 package com.hfr.handler;
 
 import com.hfr.inventory.container.*;
+import com.hfr.ender.EnderChestInteraction;
+import com.hfr.ender.RestrictedEnderChestContainer;
+import net.minecraft.init.Blocks;
+import net.minecraft.tileentity.TileEntityEnderChest;
 import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.ContainerChest;
@@ -8,7 +12,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
 import com.hfr.blocks.ModBlocks;
-import com.hfr.blocks.machine.MachineMarket.TileEntityMarket;
 import com.hfr.inventory.gui.GUIAlloy;
 import com.hfr.inventory.gui.GUIBattery;
 import com.hfr.inventory.gui.GUIBlastFurnace;
@@ -28,7 +31,6 @@ import com.hfr.inventory.gui.GUILaunchPad;
 import com.hfr.inventory.gui.GUIMachineBuilder;
 import com.hfr.inventory.gui.GUIBuilderNPC;
 import com.hfr.inventory.gui.GUIMachineEMP;
-import com.hfr.inventory.gui.GUIMachineMarket;
 import com.hfr.inventory.gui.GUIMachineNet;
 import com.hfr.inventory.gui.GUIMachineOilWell;
 import com.hfr.inventory.gui.GUIMachineRadar;
@@ -57,6 +59,11 @@ public class GUIHandler implements IGuiHandler {
 	@Override
 	public Object getServerGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
 		TileEntity entity = world.getTileEntity(x, y, z);
+		if (ID == EnderChestInteraction.GUI_ID) {
+			if (world.getBlock(x, y, z) != Blocks.ender_chest || !(entity instanceof TileEntityEnderChest)) return null;
+			player.getInventoryEnderChest().func_146031_a((TileEntityEnderChest) entity);
+			return new RestrictedEnderChestContainer(player.inventory, player.getInventoryEnderChest());
+		}
 		switch(ID)
 		{
 			case ModBlocks.guiID_siren:
@@ -386,6 +393,8 @@ public class GUIHandler implements IGuiHandler {
 
 	@Override
 	public Object getClientGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
+		if (ID == EnderChestInteraction.GUI_ID)
+			return new GuiChest(player.inventory, player.getInventoryEnderChest());
 		TileEntity entity = world.getTileEntity(x, y, z);
 		if(entity != null)
 		{
@@ -677,9 +686,8 @@ public class GUIHandler implements IGuiHandler {
 				
 				case ModBlocks.guiID_market:
 				{
-					if(entity instanceof TileEntityMarket) {
-						return new GUIMachineMarket(player, (TileEntityMarket) entity);
-					}
+					// Shop screens are opened exclusively by validated server snapshots.
+					return null;
 				}
 				
 				case ModBlocks.guiID_efurnace:

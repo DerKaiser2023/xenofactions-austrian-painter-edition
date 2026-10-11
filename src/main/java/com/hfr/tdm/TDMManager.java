@@ -94,7 +94,11 @@ public class TDMManager {
             if (onlyPlayer != null && player != onlyPlayer) continue;
             if (player.worldObj != world || (onlyPlayer == null && TDMSpectatorManager.isObserving(player))) continue;
             Team team = getPlayerTeam(world, player.getCommandSenderName());
-            if (onlyPlayer == null && (team == null || (onlyTeam != null && team != onlyTeam))) continue;
+            if (onlyPlayer == null) {
+                if (isFfaMode(world)) {
+                    if (onlyTeam != null || !isCompetitivePlayer(player)) continue;
+                } else if (team == null || (onlyTeam != null && team != onlyTeam)) continue;
+            }
             PacketDispatcher.wrapper.sendTo(new TDMSoundPacket(sound), player);
             recipients++;
         }
@@ -136,7 +140,11 @@ public class TDMManager {
         }
     }
 
-    public enum TDMGameMode { DEATHMATCH, BOMB, FFA }
+    public enum TDMGameMode {
+        DEATHMATCH("TDM"), BOMB("Search and Destroy"), FFA("FFA");
+        public final String displayName;
+        TDMGameMode(String displayName) { this.displayName = displayName; }
+    }
     public enum BombRole { TERRORIST, COUNTER_TERRORIST }
     public enum KitSelectionResult { SUCCESS, INSUFFICIENT_FUNDS, INVALID_SELECTION, BUY_PHASE_ENDED, ALREADY_SELECTED }
     /** BUY_PHASE is competitive BOMB economy state; LOADOUT_SELECTION is economy-free DM/FFA state. */
@@ -145,10 +153,12 @@ public class TDMManager {
     private static final class SelectedKit {
         final Team pool;
         final int index;
+        final Object identity;
 
-        SelectedKit(Team pool, int index) {
+        SelectedKit(Team pool, int index, Object identity) {
             this.pool = pool;
             this.index = index;
+            this.identity = identity;
         }
     }
     private static final class FreezeAnchor { final int dimension; final double x,y,z; FreezeAnchor(EntityPlayer p){dimension=p.dimension;x=p.posX;y=p.posY;z=p.posZ;} }
@@ -170,7 +180,16 @@ public class TDMManager {
 
     public static class TDMMap {
         public final String name;
-        public final List<SpawnPoint> spawns = new ArrayList<SpawnPoint>();
+        public final java.util.EnumMap<TDMGameMode, List<SpawnPoint>> spawnSets = new java.util.EnumMap<TDMGameMode, List<SpawnPoint>>(TDMGameMode.class);
+        /** Preserved legacy entries whose category did not match the map's former mode. */
+        public final List<SpawnPoint> legacyUnassignedSpawns = new ArrayList<SpawnPoint>();
+        public final java.util.EnumSet<TDMGameMode> supportedModes = java.util.EnumSet.of(TDMGameMode.DEATHMATCH);
+        /** Map-wide ballot visibility, independent of supported modes and admin selection. */
+        public boolean votingEnabled = true;
+        /** Explicit sharing only; an empty mode-specific set never borrows another mode implicitly. */
+        public final java.util.EnumMap<TDMGameMode, TDMGameMode> spawnFallbacks = new java.util.EnumMap<TDMGameMode, TDMGameMode>(TDMGameMode.class);
+        /** Old global spawns are eligible only for the map's original saved mode. */
+        public TDMGameMode legacyGlobalSpawnMode;
         /** Zero means inherit the global setting. */
         public int scoreLimitOverride;
         /** Zero means inherit the global setting; positive values are ticks. */
@@ -191,9 +210,20 @@ public class TDMManager {
         public int bombPlantBuyScoreReward = 1;
         public final Bombsite bombsiteA = new Bombsite();
         public final Bombsite bombsiteB = new Bombsite();
+        /** Optional map-owned boundary; independent of Clowder claims. */
+        public final Bombsite bounds = new Bombsite();
+        /** Opt-in horizontal player border using the bounds footprint. */
+        public boolean mapBorderEnabled;
 
         public TDMMap(String name) {
             this.name = normalizeMapName(name);
+            for (TDMGameMode gameMode : TDMGameMode.values()) spawnSets.put(gameMode, new ArrayList<SpawnPoint>());
+        }
+        public List<SpawnPoint> spawns(TDMGameMode gameMode) { return spawnSets.get(gameMode); }
+        public List<SpawnPoint> resolvedSpawns(TDMGameMode gameMode) {
+            List<SpawnPoint> own = spawns(gameMode);
+            TDMGameMode fallback = spawnFallbacks.get(gameMode);
+            return own.isEmpty() && fallback != null && fallback != gameMode ? spawns(fallback) : own;
         }
     }
 
@@ -201,7 +231,40 @@ public class TDMManager {
         return TDMData.get(world).maps.get(normalizeMapName(name));
     }
     public static TDMMap getSelectedMapData(World world) { return getMap(world, getSelectedMap(world)); }
-    public static TDMGameMode getGameMode(World world) { TDMMap m=getSelectedMapData(world); return m == null ? TDMGameMode.DEATHMATCH : m.mode; }
+    public static TDMGameMode getGameMode(World world) { return TDMData.get(world).selectedMode; }
+    public static String pairId(String map, TDMGameMode mode) { return normalizeMapName(map) + "|" + mode.name(); }
+    public static TDMGameMode parseMode(String value) {
+        if (value == null) return null;
+        if (value.equalsIgnoreCase("sd") || value.equalsIgnoreCase("snd") || value.equalsIgnoreCase("searchanddestroy")) return TDMGameMode.BOMB;
+        if (value.equalsIgnoreCase("tdm")) return TDMGameMode.DEATHMATCH;
+        try { return TDMGameMode.valueOf(value.toUpperCase(java.util.Locale.ROOT)); }
+        catch (IllegalArgumentException exception) { return null; }
+    }
+    public static String pairLabel(String map, TDMGameMode mode) { return normalizeMapName(map) + " \u2014 " + mode.displayName; }
+    private static String pairMap(String id) { int split = id.lastIndexOf('|'); return split < 0 ? normalizeMapName(id) : normalizeMapName(id.substring(0, split)); }
+    private static TDMGameMode pairMode(TDMData data, String id) {
+        int split = id.lastIndexOf('|');
+        if (split < 0) { TDMMap map = data.maps.get(pairMap(id)); return map == null ? null : map.mode; }
+        return parseMode(id.substring(split + 1));
+    }
+    private static boolean availablePair(TDMData data, String id) {
+        TDMMap map = data.maps.get(pairMap(id)); TDMGameMode mode = pairMode(data, id);
+        return map != null && map.votingEnabled && mode != null && map.supportedModes.contains(mode);
+    }
+    public static List<String> getVoteOptions(World world) { return getVoteOptions(TDMData.get(world)); }
+    private static List<String> getVoteOptions(TDMData data) {
+        List<String> options = new ArrayList<String>();
+        for (TDMMap map : data.maps.values()) if (map.votingEnabled)
+            for (TDMGameMode mode : TDMGameMode.values())
+                if (map.supportedModes.contains(mode)) options.add(pairId(map.name, mode));
+        return options;
+    }
+    public static String voteLabel(String id) {
+        int split = id.lastIndexOf('|');
+        if (split < 0) return id;
+        try { return pairLabel(id.substring(0, split), TDMGameMode.valueOf(id.substring(split + 1))); }
+        catch (IllegalArgumentException exception) { return id; }
+    }
     public static Team getTerroristTeam(World world) { TDMMap m=getSelectedMapData(world); return m == null ? Team.RED : m.terroristTeam; }
     public static Team getCounterTerroristTeam(World world) { return getTerroristTeam(world) == Team.RED ? Team.BLUE : Team.RED; }
     public static BombRole getBombRole(World world, Team team) { return team == null ? null : (team == getTerroristTeam(world) ? BombRole.TERRORIST : BombRole.COUNTER_TERRORIST); }
@@ -210,7 +273,7 @@ public class TDMManager {
     public static boolean isCounterTerrorist(EntityPlayer player) { return getBombRole(player) == BombRole.COUNTER_TERRORIST; }
     public static boolean isHardcoreRespawns(World world) {
         TDMMap map = getSelectedMapData(world);
-        return map != null && map.hardcoreRespawns;
+        return map != null && isBombMode(world) && map.hardcoreRespawns;
     }
     public static boolean isBombMode(World world) { return getGameMode(world) == TDMGameMode.BOMB; }
     public static boolean isFfaMode(World world) { return getGameMode(world) == TDMGameMode.FFA; }
@@ -244,14 +307,17 @@ public class TDMManager {
         TDMMap map = data.maps.get(normalizeMapName(name));
         if (map == null || mode == null) return false;
         TDMGameMode oldMode = map.mode;
-        if (oldMode == mode) return true;
+        if (oldMode == mode && (!data.selectedMap.equals(map.name) || data.selectedMode == mode)) return true;
 
-        boolean changingSelectedActiveMap = data.enabled && data.selectedMap.equals(map.name);
+        boolean changingSelectedActiveMap = data.enabled && data.selectedMap.equals(map.name)
+                && data.selectedMode != mode;
         if (changingSelectedActiveMap) {
             stopSelectedMapLifecycle(world);
         }
 
         map.mode = mode;
+        map.supportedModes.add(mode);
+        if (data.selectedMap.equals(map.name)) data.selectedMode = mode;
         data.markDirty();
         if (!changingSelectedActiveMap) return true;
 
@@ -325,13 +391,22 @@ public class TDMManager {
         public final Team team;
         public final int dim;
         public final int x, y, z;
+        public final boolean hasRotation;
+        public final float yaw, pitch;
 
         public SpawnPoint(Team team, int dim, int x, int y, int z) {
+            this(team, dim, x, y, z, false, 0, 0);
+        }
+
+        public SpawnPoint(Team team, int dim, int x, int y, int z, boolean hasRotation, float yaw, float pitch) {
             this.team = team;
             this.dim = dim;
             this.x = x;
             this.y = y;
             this.z = z;
+            this.hasRotation = hasRotation;
+            this.yaw = yaw;
+            this.pitch = pitch;
         }
     }
 
@@ -413,9 +488,12 @@ public class TDMManager {
             return false;
         }
 
-        data.maps.put(normalized, new TDMMap(normalized));
+        TDMMap map = new TDMMap(normalized);
+        map.votingEnabled = false;
+        data.maps.put(normalized, map);
         if (data.selectedMap.length() == 0) {
             data.selectedMap = normalized;
+            data.selectedMode = TDMGameMode.DEATHMATCH;
         }
         data.markDirty();
         return true;
@@ -430,11 +508,12 @@ public class TDMManager {
 
         if (data.selectedMap.equals(normalized)) {
             data.selectedMap = "";
+            data.selectedMode = TDMGameMode.DEATHMATCH;
         }
 
         List<String> playersToClear = new ArrayList<String>();
         for (Map.Entry<String, String> entry : data.mapVotes.entrySet()) {
-            if (entry.getValue().equals(normalized)) {
+            if (pairMap(entry.getValue()).equals(normalized)) {
                 playersToClear.add(entry.getKey());
             }
         }
@@ -447,9 +526,14 @@ public class TDMManager {
     }
 
     public static boolean selectMap(World world, String mapName) {
+        TDMMap map = getMap(world, mapName);
+        return map != null && selectMap(world, mapName, map.mode);
+    }
+
+    public static boolean selectMap(World world, String mapName, TDMGameMode mode) {
         String normalized = normalizeMapName(mapName);
         TDMData data = TDMData.get(world);
-        if (!data.maps.containsKey(normalized)) {
+        if (!data.maps.containsKey(normalized) || mode == null || !data.maps.get(normalized).supportedModes.contains(mode)) {
             return false;
         }
 
@@ -457,12 +541,40 @@ public class TDMManager {
         data.playerBuyScores.clear();
         clearSkipVote(data);
         data.selectedMap = normalized;
+        data.selectedMode = mode;
         data.markDirty();
+        if (data.enabled) startRound(world, false);
         return true;
     }
 
     public static String getSelectedMap(World world) {
         return TDMData.get(world).selectedMap;
+    }
+
+    public static boolean setSupportedMode(World world, String mapName, TDMGameMode mode, boolean enabled) {
+        TDMData data = TDMData.get(world);
+        TDMMap map = data.maps.get(normalizeMapName(mapName));
+        if (map == null || mode == null || (!enabled && map.supportedModes.size() == 1 && map.supportedModes.contains(mode))
+                || (!enabled && data.selectedMap.equals(map.name) && data.selectedMode == mode)) return false;
+        if (enabled) map.supportedModes.add(mode); else map.supportedModes.remove(mode);
+        if (!map.supportedModes.contains(map.mode)) map.mode = map.supportedModes.iterator().next();
+        data.markDirty();
+        if (data.mapVoteActive) refreshMapVoteGui(world);
+        return true;
+    }
+
+    public static boolean setMapVotingEnabled(World world, String mapName, boolean enabled) {
+        TDMData data = TDMData.get(world);
+        TDMMap map = data.maps.get(normalizeMapName(mapName));
+        if (map == null) return false;
+        map.votingEnabled = enabled;
+        if (!enabled) {
+            java.util.Iterator<Map.Entry<String, String>> votes = data.mapVotes.entrySet().iterator();
+            while (votes.hasNext()) if (pairMap(votes.next().getValue()).equals(map.name)) votes.remove();
+        }
+        data.markDirty();
+        if (data.mapVoteActive) refreshMapVoteGui(world);
+        return true;
     }
 
     public static boolean hasMap(World world, String mapName) {
@@ -510,55 +622,132 @@ public class TDMManager {
     }
 
     public static boolean setMapScoreLimit(World world, String mapName, int scoreLimit) {
+        TDMMap map = getMap(world, mapName);
+        return map != null && setMapScoreLimit(world, mapName, map.mode, scoreLimit);
+    }
+    public static boolean setMapScoreLimit(World world, String mapName, TDMGameMode mode, int scoreLimit) {
         TDMData data = TDMData.get(world);
         TDMMap map = data.maps.get(normalizeMapName(mapName));
-        if (map == null || scoreLimit < 0) return false;
-        if (map.mode == TDMGameMode.BOMB) map.bombScoreLimitOverride = scoreLimit;
+        if (map == null || mode == null || scoreLimit < 0) return false;
+        if (mode == TDMGameMode.BOMB) map.bombScoreLimitOverride = scoreLimit;
         else map.scoreLimitOverride = scoreLimit;
         data.markDirty();
         return true;
     }
 
     public static boolean setMapRoundTicks(World world, String mapName, int roundTicks) {
+        TDMMap map = getMap(world, mapName);
+        return map != null && setMapRoundTicks(world, mapName, map.mode, roundTicks);
+    }
+    public static boolean setMapRoundTicks(World world, String mapName, TDMGameMode mode, int roundTicks) {
         TDMData data = TDMData.get(world);
         TDMMap map = data.maps.get(normalizeMapName(mapName));
-        if (map == null || roundTicks < 0) return false;
-        if (map.mode == TDMGameMode.BOMB) map.bombRoundTicksOverride = roundTicks;
+        if (map == null || mode == null || roundTicks < 0) return false;
+        if (mode == TDMGameMode.BOMB) map.bombRoundTicksOverride = roundTicks;
         else map.roundTicksOverride = roundTicks;
         data.markDirty();
         return true;
     }
 
     public static void addMapSpawn(World world, String mapName, Team team, int dim, int x, int y, int z) {
+        addMapSpawn(world, mapName, new SpawnPoint(team, dim, x, y, z));
+    }
+
+    public static void addMapSpawn(World world, String mapName, SpawnPoint spawn) {
+        TDMMap map = getMap(world, mapName);
+        addMapSpawn(world, mapName, map == null ? TDMGameMode.DEATHMATCH : map.mode, spawn);
+    }
+
+    public static void addMapSpawn(World world, String mapName, TDMGameMode mode, SpawnPoint spawn) {
         TDMData data = TDMData.get(world);
         String normalized = normalizeMapName(mapName);
         TDMMap map = data.maps.get(normalized);
         if (map == null) {
             map = new TDMMap(normalized);
+            map.votingEnabled = false;
             data.maps.put(normalized, map);
         }
 
-        map.spawns.add(new SpawnPoint(team, dim, x, y, z));
+        map.spawns(mode).add(spawn);
         if (data.selectedMap.length() == 0) {
             data.selectedMap = normalized;
         }
         data.markDirty();
     }
 
+    public static boolean updateMapSpawn(World world, String mapName, int index, SpawnPoint spawn) {
+        TDMMap map = getMap(world, mapName);
+        return map != null && updateMapSpawn(world, mapName, map.mode, index, spawn);
+    }
+    public static boolean updateMapSpawn(World world, String mapName, TDMGameMode mode, int index, SpawnPoint spawn) {
+        TDMMap map = getMap(world, mapName);
+        if (map == null || mode == null || index < 0 || index >= map.spawns(mode).size() || spawn == null) return false;
+        map.spawns(mode).set(index, spawn);
+        TDMData.get(world).markDirty();
+        return true;
+    }
+
+    public static boolean removeMapSpawn(World world, String mapName, int index) {
+        TDMMap map = getMap(world, mapName);
+        return map != null && removeMapSpawn(world, mapName, map.mode, index);
+    }
+    public static boolean removeMapSpawn(World world, String mapName, TDMGameMode mode, int index) {
+        TDMMap map = getMap(world, mapName);
+        if (map == null || mode == null || index < 0 || index >= map.spawns(mode).size()) return false;
+        map.spawns(mode).remove(index);
+        TDMData.get(world).markDirty();
+        return true;
+    }
+
+    public static boolean setMapBounds(World world, String name, int dim, int x1, int y1, int z1, int x2, int y2, int z2) {
+        TDMMap map = getMap(world, name);
+        if (map == null) return false;
+        Bombsite b = map.bounds;
+        b.dimension = dim; b.x1 = x1; b.y1 = y1; b.z1 = z1;
+        b.x2 = x2; b.y2 = y2; b.z2 = z2; b.hasPos1 = b.hasPos2 = true;
+        TDMData.get(world).markDirty();
+        return true;
+    }
+
+    public static boolean clearMapBounds(World world, String name) {
+        TDMMap map = getMap(world, name);
+        if (map == null) return false;
+        map.bounds.clear();
+        map.mapBorderEnabled = false;
+        TDMData.get(world).markDirty();
+        return true;
+    }
+
+    public static boolean setMapBorderEnabled(World world, String name, boolean enabled) {
+        TDMMap map = getMap(world, name);
+        if (map == null || (enabled && !map.bounds.isComplete())) return false;
+        map.mapBorderEnabled = enabled;
+        TDMData.get(world).markDirty();
+        return true;
+    }
+
     public static boolean clearMapSpawns(World world, String mapName) {
+        TDMMap map = getMap(world, mapName);
+        return map != null && clearMapSpawns(world, mapName, map.mode);
+    }
+    public static boolean clearMapSpawns(World world, String mapName, TDMGameMode mode) {
         TDMMap map = TDMData.get(world).maps.get(normalizeMapName(mapName));
-        if (map == null) {
+        if (map == null || mode == null) {
             return false;
         }
 
-        map.spawns.clear();
+        map.spawns(mode).clear();
         TDMData.get(world).markDirty();
         return true;
     }
 
     public static int getMapSpawnCount(World world, String mapName) {
         TDMMap map = TDMData.get(world).maps.get(normalizeMapName(mapName));
-        return map == null ? 0 : map.spawns.size();
+        return map == null ? 0 : map.spawns(map.mode).size();
+    }
+    public static int getMapSpawnCount(World world, String mapName, TDMGameMode mode) {
+        TDMMap map = getMap(world, mapName);
+        return map == null || mode == null ? 0 : map.spawns(mode).size();
     }
 
     public static int getMapSpawnCount(World world, String mapName, Team team) {
@@ -568,25 +757,46 @@ public class TDMManager {
         }
 
         int count = 0;
-        for (SpawnPoint spawn : map.spawns) {
+        for (SpawnPoint spawn : map.spawns(map.mode)) {
             if (spawn.team == team) {
                 count++;
             }
         }
         return count;
     }
+    public static boolean setSpawnFallback(World world, String mapName, TDMGameMode mode, TDMGameMode fallback) {
+        TDMMap map = getMap(world, mapName);
+        if (map == null || mode == null || mode == fallback
+                || (fallback != null && (mode == TDMGameMode.FFA) != (fallback == TDMGameMode.FFA))) return false;
+        if (fallback == null) map.spawnFallbacks.remove(mode); else map.spawnFallbacks.put(mode, fallback);
+        TDMData.get(world).markDirty();
+        return true;
+    }
+    public static boolean assignLegacySpawn(World world, String mapName, int index, TDMGameMode mode) {
+        TDMMap map = getMap(world, mapName);
+        if (map == null || mode == null || index < 0 || index >= map.legacyUnassignedSpawns.size()) return false;
+        SpawnPoint spawn = map.legacyUnassignedSpawns.get(index);
+        if ((mode == TDMGameMode.FFA) != (spawn.team == null)) return false;
+        map.legacyUnassignedSpawns.remove(index);
+        map.spawns(mode).add(spawn);
+        TDMData.get(world).markDirty();
+        return true;
+    }
 
     public static String voteForMap(World world, String playerName, String mapName) {
         String normalized = normalizeMapName(mapName);
         TDMData data = TDMData.get(world);
-        if (!data.enabled || !data.mapVoteActive || !data.maps.containsKey(normalized)
-                || normalized.equals(normalizeMapName(data.selectedMap))) {
+        TDMGameMode requestedMode = pairMode(data, mapName);
+        String pair = mapName.indexOf('|') >= 0 && requestedMode != null ? pairId(pairMap(mapName), requestedMode)
+                : data.maps.containsKey(normalized) ? pairId(normalized, data.maps.get(normalized).mode) : "";
+        if (!data.enabled || !data.mapVoteActive || !availablePair(data, pair)
+                || pair.equals(pairId(data.selectedMap, data.selectedMode))) {
             return null;
         }
 
-        data.mapVotes.put(playerName.toLowerCase(), normalized);
+        data.mapVotes.put(playerName.toLowerCase(), pair);
         data.markDirty();
-        return normalized;
+        return voteLabel(pair);
     }
 
 
@@ -622,8 +832,8 @@ public class TDMManager {
     public static Map<String, Integer> getVoteCounts(World world) {
         TDMData data = TDMData.get(world);
         Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
-        for (String mapName : data.maps.keySet()) {
-            counts.put(mapName, Integer.valueOf(0));
+        for (String pair : getVoteOptions(data)) {
+            counts.put(pair, Integer.valueOf(0));
         }
         for (String mapName : data.mapVotes.values()) {
             if (counts.containsKey(mapName)) {
@@ -637,9 +847,9 @@ public class TDMManager {
         String winner = null;
         int winnerVotes = -1;
         Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
-        for (String mapName : data.maps.keySet()) {
-            if (mapName.equals(normalizeMapName(data.selectedMap))) continue;
-            counts.put(mapName, Integer.valueOf(0));
+        for (String pair : getVoteOptions(data)) {
+            if (pair.equals(pairId(data.selectedMap, data.selectedMode))) continue;
+            counts.put(pair, Integer.valueOf(0));
         }
         for (String mapName : data.mapVotes.values()) {
             if (counts.containsKey(mapName)) {
@@ -795,7 +1005,7 @@ public class TDMManager {
         if (map == null) return;
         if (map.killstreaksEnabled && map.killScoreReward > 0) addPlayerKillScore(attacker, map.killScoreReward);
         // Point score is last because reaching the threshold may synchronously end/reset the match.
-        if (map.mode == TDMGameMode.FFA) addPlayerPointScore(attacker, POINTS_PER_KILL);
+        if (getGameMode(attacker.worldObj) == TDMGameMode.FFA) addPlayerPointScore(attacker, POINTS_PER_KILL);
     }
 
     public static int getPlayerPointScore(EntityPlayer player) { return player == null ? 0 : getPlayerPointScore(player.worldObj, getPlayerKey(player)); }
@@ -803,7 +1013,7 @@ public class TDMManager {
     public static int getPlayerKillScore(EntityPlayer player) { Integer value=player==null?null:TDMData.get(player.worldObj).playerKillScores.get(getPlayerKey(player));return value==null?0:Math.max(0,value.intValue()); }
     private static void addPlayerPointScore(EntityPlayer player,int amount){if(amount<=0||nonBombRoundEnding)return;TDMData data=TDMData.get(player.worldObj);String key=getPlayerKey(player);int old=getPlayerPointScore(player);int next=old>Integer.MAX_VALUE-amount?Integer.MAX_VALUE:old+amount;data.playerPointScores.put(key,Integer.valueOf(next));data.markDirty();if(next>=getEffectiveScoreLimit(player.worldObj))finishNonBombRound(player.worldObj);else sendStatusToAll(player.worldObj);}
     private static void addPlayerKillScore(EntityPlayer player,int amount){if(amount<=0)return;TDMData data=TDMData.get(player.worldObj);String key=getPlayerKey(player);int old=getPlayerKillScore(player);int next=old>Integer.MAX_VALUE-amount?Integer.MAX_VALUE:old+amount;data.playerKillScores.put(key,Integer.valueOf(next));data.markDirty();sendStatusToAll(player.worldObj);}
-    public static boolean spendPlayerKillScore(EntityPlayer player,int cost){if(player==null||cost<0)return false;TDMMap map=getSelectedMapData(player.worldObj);if(map==null||!map.killstreaksEnabled||(map.mode!=TDMGameMode.DEATHMATCH&&map.mode!=TDMGameMode.FFA))return false;TDMData data=TDMData.get(player.worldObj);int balance=getPlayerKillScore(player);if(balance<cost)return false;data.playerKillScores.put(getPlayerKey(player),Integer.valueOf(balance-cost));data.markDirty();sendStatusToAll(player.worldObj);return true;}
+    public static boolean spendPlayerKillScore(EntityPlayer player,int cost){if(player==null||cost<0)return false;TDMMap map=getSelectedMapData(player.worldObj);if(map==null||!map.killstreaksEnabled||getGameMode(player.worldObj)==TDMGameMode.BOMB)return false;TDMData data=TDMData.get(player.worldObj);int balance=getPlayerKillScore(player);if(balance<cost)return false;data.playerKillScores.put(getPlayerKey(player),Integer.valueOf(balance-cost));data.markDirty();sendStatusToAll(player.worldObj);return true;}
 
     private static void finishNonBombRound(World world) {
         if (nonBombRoundEnding || isBombMode(world) || !isEnabled(world)) return;
@@ -870,8 +1080,9 @@ public class TDMManager {
     public static void finishMapVote(World world) {
         TDMData data = TDMData.get(world);
         String winner = getWinningMap(data);
-        if (winner != null && data.maps.containsKey(winner)) {
-            data.selectedMap = winner;
+        if (winner != null && availablePair(data, winner)) {
+            data.selectedMap = pairMap(winner);
+            data.selectedMode = pairMode(data, winner);
         }
         data.mapVoteActive = false;
         data.mapVoteEndTick = 0;
@@ -926,21 +1137,29 @@ public class TDMManager {
     }
 
     private static void sendMapVoteGuiToAll(World world) {
-        List<String> mapNames = getMapNames(world);
+        List<String> mapNames = getVoteOptions(world);
         if (mapNames.isEmpty()) {
             return;
         }
 
         String[] maps = mapNames.toArray(new String[mapNames.size()]);
         for (EntityPlayerMP player : getOnlinePlayers()) {
-            PacketDispatcher.wrapper.sendTo(new TDMMapVoteGuiPacket(maps, MAP_VOTE_TICKS / 20, getSelectedMap(world)), player);
+            PacketDispatcher.wrapper.sendTo(new TDMMapVoteGuiPacket(maps, MAP_VOTE_TICKS / 20, pairId(getSelectedMap(world), getGameMode(world))), player);
         }
+    }
+
+    private static void refreshMapVoteGui(World world) {
+        List<String> options = getVoteOptions(world);
+        String[] pairs = options.toArray(new String[options.size()]);
+        String current = pairId(getSelectedMap(world), getGameMode(world));
+        for (EntityPlayerMP player : getOnlinePlayers())
+            PacketDispatcher.wrapper.sendTo(new TDMMapVoteGuiPacket(pairs, getRemainingVoteSeconds(world), current, true), player);
     }
 
     private static List<String> getAlternativeMapNames(TDMData data) {
         List<String> alternatives = new ArrayList<String>();
-        String current = normalizeMapName(data.selectedMap);
-        for (String map : data.maps.keySet()) if (!map.equals(current)) alternatives.add(map);
+        String current = pairId(data.selectedMap, data.selectedMode);
+        for (String pair : getVoteOptions(data)) if (!pair.equals(current)) alternatives.add(pair);
         return alternatives;
     }
 
@@ -1067,7 +1286,7 @@ public class TDMManager {
             return false;
         }
 
-        if(map.mode==TDMGameMode.FFA){
+        if(getGameMode(world)==TDMGameMode.FFA){
             boolean available=hasSpawnForTeam(data,map,null);
             if(!available)logInvalidSpawn(null,map.name,null,world.provider.dimensionId);
             return available;
@@ -1084,7 +1303,7 @@ public class TDMManager {
     }
 
     private static boolean hasSpawnForTeam(TDMData data, TDMMap map, Team team) {
-        List<SpawnPoint> source = map.spawns.isEmpty() ? data.spawns : map.spawns;
+        List<SpawnPoint> source = resolvedSpawns(data, map, data.selectedMode);
         for (SpawnPoint spawn : source) {
             if (spawn.team == team
                     && net.minecraftforge.common.DimensionManager.isDimensionRegistered(spawn.dim)) {
@@ -1196,14 +1415,17 @@ public class TDMManager {
         return (int) ((ticksLeft + 19) / 20);
     }
 
-    public static void setPlayerTeam(World world, String playerName, Team team) {
+    public static boolean setPlayerTeam(World world, String playerName, Team team) {
+        if (isFfaMode(world)) return false;
         TDMData data = TDMData.get(world);
         teamlessPlayers.remove(playerName.toLowerCase());
         data.playerTeams.put(playerName.toLowerCase(), team);
         data.markDirty();
+        return true;
     }
 
     public static Team getPlayerTeam(World world, String playerName) {
+        if (isFfaMode(world)) return null;
         return TDMData.get(world).playerTeams.get(playerName.toLowerCase());
     }
 
@@ -1262,7 +1484,7 @@ public class TDMManager {
 
     public static int balanceTeams(World world) {
         TDMData data = TDMData.get(world);
-        if (!data.enabled) {
+        if (!data.enabled || data.selectedMode == TDMGameMode.FFA) {
             return 0;
         }
         if (TDMBombManager.isRoundActive()) return 0;
@@ -1341,13 +1563,13 @@ public class TDMManager {
     }
 
     public static int getBuyScore(EntityPlayer player){Integer v=TDMData.get(player.worldObj).playerBuyScores.get(getPlayerKey(player));return v==null?0:Math.max(0,v.intValue());}
-    public static boolean spendBuyScore(EntityPlayer player,int amount){if(player==null||amount<0)return false;TDMMap map=getSelectedMapData(player.worldObj);if(map==null||map.mode!=TDMGameMode.BOMB||!map.buyScoreEnabled||!isGlobalBombBuyPeriod(player))return false;int balance=getBuyScore(player);if(balance<amount)return false;TDMData data=TDMData.get(player.worldObj);data.playerBuyScores.put(getPlayerKey(player),Integer.valueOf(balance-amount));data.markDirty();sendStatusToAll(player.worldObj);return true;}
-    public static void addBuyScore(EntityPlayer player,int amount){TDMMap map=getSelectedMapData(player.worldObj);if(map==null||map.mode!=TDMGameMode.BOMB||!map.buyScoreEnabled||amount<=0)return;TDMData d=TDMData.get(player.worldObj);int old=getBuyScore(player);int next=old>Integer.MAX_VALUE-amount?Integer.MAX_VALUE:old+amount;d.playerBuyScores.put(getPlayerKey(player),Integer.valueOf(next));d.markDirty();sendStatusToAll(player.worldObj);}
-    public static void awardKillBuyScore(EntityPlayer player){TDMMap map=getSelectedMapData(player.worldObj);if(map!=null&&map.mode==TDMGameMode.BOMB&&map.buyScoreEnabled&&isCompetitivePlayer(player)&&TDMBombManager.isRoundActive())addBuyScore(player,map.killBuyScoreReward);}
+    public static boolean spendBuyScore(EntityPlayer player,int amount){if(player==null||amount<0)return false;TDMMap map=getSelectedMapData(player.worldObj);if(map==null||!isBombMode(player.worldObj)||!map.buyScoreEnabled||!isGlobalBombBuyPeriod(player))return false;int balance=getBuyScore(player);if(balance<amount)return false;TDMData data=TDMData.get(player.worldObj);data.playerBuyScores.put(getPlayerKey(player),Integer.valueOf(balance-amount));data.markDirty();sendStatusToAll(player.worldObj);return true;}
+    public static void addBuyScore(EntityPlayer player,int amount){TDMMap map=getSelectedMapData(player.worldObj);if(map==null||!isBombMode(player.worldObj)||!map.buyScoreEnabled||amount<=0)return;TDMData d=TDMData.get(player.worldObj);int old=getBuyScore(player);int next=old>Integer.MAX_VALUE-amount?Integer.MAX_VALUE:old+amount;d.playerBuyScores.put(getPlayerKey(player),Integer.valueOf(next));d.markDirty();sendStatusToAll(player.worldObj);}
+    public static void awardKillBuyScore(EntityPlayer player){TDMMap map=getSelectedMapData(player.worldObj);if(map!=null&&isBombMode(player.worldObj)&&map.buyScoreEnabled&&isCompetitivePlayer(player)&&TDMBombManager.isRoundActive())addBuyScore(player,map.killBuyScoreReward);}
     public static void awardRoundWinBuyScore(World world,Team team,EntityPlayer individual){TDMMap map=getSelectedMapData(world);if(map==null)return;if(individual!=null){if(isCompetitivePlayer(individual))addBuyScore(individual,map.roundWinBuyScoreReward);return;}for(EntityPlayerMP p:getOnlinePlayers())if(p.worldObj==world&&isCompetitivePlayer(p)&&getPlayerTeam(world,p.getCommandSenderName())==team)addBuyScore(p,map.roundWinBuyScoreReward);}
     /** Finalizes competitive BOMB winner and loser economy once the authoritative result is known. */
     public static void awardRoundResultBuyScore(World world, Team winningTeam, String individualWinner, Set<String> participants) {
-        TDMMap map=getSelectedMapData(world); if(map==null||map.mode!=TDMGameMode.BOMB||!map.buyScoreEnabled||participants==null)return;
+        TDMMap map=getSelectedMapData(world); if(map==null||!isBombMode(world)||!map.buyScoreEnabled||participants==null)return;
         TDMData data=TDMData.get(world);
         for(String key:participants){
             if(teamlessPlayers.contains(key))continue;
@@ -1514,10 +1736,11 @@ public class TDMManager {
         SelectedKit selected = selectedKits.get(getPlayerKey(player));
         Team team = getPlayerTeam(player.worldObj, player.getCommandSenderName());
         return selected != null && team != null && selected.pool == team
-                && TDMKitManager.getKitCost(getSelectedMap(player.worldObj), team, selected.index) >= 0;
+                && selected.identity == TDMKitManager.getAvailableKitIdentity(getSelectedMap(player.worldObj), team,
+                        TDMGameMode.BOMB, selected.index);
     }
     public static void offerSurvivorChoice(EntityPlayer player){if(!(player instanceof EntityPlayerMP)||!hasValidSelectedKit(player))return;survivorChoicePending.add(getPlayerKey(player));PacketDispatcher.wrapper.sendTo(new TDMSurvivorChoiceGuiPacket(),(EntityPlayerMP)player);}
-    public static boolean handleSurvivorChoice(EntityPlayer player,boolean keep){String key=getPlayerKey(player);if(!survivorChoicePending.remove(key)||!isGlobalBombBuyPeriod(player)||!hasValidSelectedKit(player))return false;if(!keep){promptForKit(player,KitSelectionContext.BUY_PHASE);return true;}Team team=getPlayerTeam(player.worldObj,player.getCommandSenderName());SelectedKit selected = selectedKits.get(key);boolean applied=TDMKitManager.applyKit(getSelectedMap(player.worldObj),team,selected.index,player);if(applied)closeKitGui(player);return applied;}
+    public static boolean handleSurvivorChoice(EntityPlayer player,boolean keep){String key=getPlayerKey(player);if(!survivorChoicePending.remove(key)||!isGlobalBombBuyPeriod(player)||!hasValidSelectedKit(player))return false;if(!keep){promptForKit(player,KitSelectionContext.BUY_PHASE);return true;}Team team=getPlayerTeam(player.worldObj,player.getCommandSenderName());SelectedKit selected = selectedKits.get(key);boolean applied=TDMKitManager.applyKit(getSelectedMap(player.worldObj),team,TDMGameMode.BOMB,selected.index,player);if(applied)closeKitGui(player);return applied;}
     public static void clearSurvivorChoice(EntityPlayer player){if(player!=null)survivorChoicePending.remove(getPlayerKey(player));}
     public static void resolvePendingSurvivorChoice(EntityPlayer player){if(player!=null&&survivorChoicePending.contains(getPlayerKey(player)))handleSurvivorChoice(player,true);}
 
@@ -1529,7 +1752,7 @@ public class TDMManager {
         }
         survivorChoicePending.remove(getPlayerKey(player));promptForKit(player,KitSelectionContext.BUY_PHASE);return true;
     }
-    private static boolean isNearTeamSpawn(EntityPlayer player,double radius){TDMMap map=getSelectedMapData(player.worldObj);if(map==null)return false;List<SpawnPoint> source=map.spawns.isEmpty()?TDMData.get(player.worldObj).spawns:map.spawns;Team team=getPlayerTeam(player.worldObj,player.getCommandSenderName());double max=radius*radius;for(SpawnPoint s:source)if(s.team==team&&s.dim==player.dimension&&player.getDistanceSq(s.x+.5D,s.y,s.z+.5D)<=max)return true;return false;}
+    private static boolean isNearTeamSpawn(EntityPlayer player,double radius){TDMMap map=getSelectedMapData(player.worldObj);if(map==null)return false;TDMData data=TDMData.get(player.worldObj);List<SpawnPoint> source=resolvedSpawns(data,map,data.selectedMode);Team team=getPlayerTeam(player.worldObj,player.getCommandSenderName());double max=radius*radius;for(SpawnPoint s:source)if(s.team==team&&s.dim==player.dimension&&player.getDistanceSq(s.x+.5D,s.y,s.z+.5D)<=max)return true;return false;}
 
     /** True for living participants in the selected map dimension throughout hardcore PRE_ROUND. */
     public static boolean isGlobalBombBuyPeriod(EntityPlayer player) {
@@ -1539,7 +1762,8 @@ public class TDMManager {
                 || TDMSpectatorManager.isObserving(player)) return false;
         TDMMap map = getSelectedMapData(player.worldObj);
         if (map == null) return false;
-        List<SpawnPoint> source = map.spawns.isEmpty() ? TDMData.get(player.worldObj).spawns : map.spawns;
+        TDMData data = TDMData.get(player.worldObj);
+        List<SpawnPoint> source = resolvedSpawns(data, map, data.selectedMode);
         for (SpawnPoint spawn : source) if (spawn.dim == player.dimension) return true;
         return false;
     }
@@ -1611,18 +1835,27 @@ public class TDMManager {
     }
 
     public static void cancelKitSelection(EntityPlayer player) {
+        cancelKitSelection(player, true);
+    }
+
+    private static void cancelKitSelection(EntityPlayer player, boolean notifyClient) {
         if (player == null) return;
         pendingKitSelection.remove(getPlayerKey(player));
         kitSelectionContexts.remove(getPlayerKey(player));
         pendingKitMaps.remove(getPlayerKey(player));
         clearKitSelectionProtection(player);
         releaseGlobalBuyProtection(player);
-        closeKitGui(player);
+        if (notifyClient) closeKitGui(player);
     }
 
     /** Clears only transient state owned by TDM; spectator flags and kit potions remain independent. */
     public static void resetTDMTransientPlayerState(EntityPlayer player) {
-        cancelKitSelection(player);
+        resetTDMTransientPlayerState(player, true);
+    }
+
+    /** Logout still clears gameplay state, but must not send through the disconnected FML channel. */
+    public static void resetTDMTransientPlayerState(EntityPlayer player, boolean notifyClient) {
+        cancelKitSelection(player, notifyClient);
         TDMPurchasableManager.clearPending(player);
         releaseRoundWaiting(player);
         survivorChoicePending.remove(getPlayerKey(player));
@@ -1665,9 +1898,10 @@ public class TDMManager {
         String mapName = getSelectedMap(player.worldObj);
         boolean ffa = isFfaMode(player.worldObj);
         Team team = ffa ? null : getOrAssignPlayerTeam(player);
-        int redCount = TDMKitManager.getKitCount(mapName, Team.RED);
-        int blueCount = TDMKitManager.getKitCount(mapName, Team.BLUE);
-        if ((!ffa && (team == null || TDMKitManager.getKitCount(mapName, team) == 0))
+        TDMGameMode activeMode = getGameMode(player.worldObj);
+        int redCount = TDMKitManager.getKitCount(mapName, Team.RED, activeMode);
+        int blueCount = TDMKitManager.getKitCount(mapName, Team.BLUE, activeMode);
+        if ((!ffa && (team == null || TDMKitManager.getKitCount(mapName, team, activeMode) == 0))
                 || (ffa && redCount == 0 && blueCount == 0)) {
             String message = "No usable TDM kits are configured for map " + mapName + ".";
             player.addChatMessage(new ChatComponentText(message + " Ask an admin to add RED or BLUE kits."));
@@ -1690,7 +1924,7 @@ public class TDMManager {
 
         TDMMap map = getSelectedMapData(player.worldObj);
         boolean economy = context != KitSelectionContext.LOADOUT_SELECTION
-                && map != null && map.mode == TDMGameMode.BOMB && map.buyScoreEnabled;
+                && map != null && isBombMode(player.worldObj) && map.buyScoreEnabled;
         if (economy && !hasAffordableKit(player, mapName, ffa, team)) {
             String message = "No configured TDM kit is affordable for your new life.";
             player.addChatMessage(new ChatComponentText(message));
@@ -1712,7 +1946,7 @@ public class TDMManager {
         int balance = getBuyScore(player);
         Team[] pools = ffa ? new Team[] { Team.RED, Team.BLUE } : new Team[] { team };
         for (Team pool : pools) {
-            int[] costs = TDMKitManager.getKitCosts(mapName, pool);
+            int[] costs = TDMKitManager.getKitCosts(mapName, pool, getGameMode(player.worldObj));
             for (int cost : costs) {
                 if (cost <= balance) {
                     return true;
@@ -1724,15 +1958,16 @@ public class TDMManager {
 
     private static void sendKitGui(EntityPlayerMP player, String mapName, Team primaryPool,
             boolean ffa, boolean economy, boolean buying) {
-        String[] redNames = ffa ? TDMKitManager.getKitNames(mapName, Team.RED)
-                : TDMKitManager.getKitNames(mapName, primaryPool);
-        int[] redCosts = ffa ? TDMKitManager.getKitCosts(mapName, Team.RED)
-                : TDMKitManager.getKitCosts(mapName, primaryPool);
-        ItemStack[][] redPreviews = ffa ? TDMKitManager.getKitPreviews(mapName, Team.RED)
-                : TDMKitManager.getKitPreviews(mapName, primaryPool);
-        String[] blueNames = ffa ? TDMKitManager.getKitNames(mapName, Team.BLUE) : new String[0];
-        int[] blueCosts = ffa ? TDMKitManager.getKitCosts(mapName, Team.BLUE) : new int[0];
-        ItemStack[][] bluePreviews = ffa ? TDMKitManager.getKitPreviews(mapName, Team.BLUE)
+        TDMGameMode mode = getGameMode(player.worldObj);
+        String[] redNames = ffa ? TDMKitManager.getKitNames(mapName, Team.RED, mode)
+                : TDMKitManager.getKitNames(mapName, primaryPool, mode);
+        int[] redCosts = ffa ? TDMKitManager.getKitCosts(mapName, Team.RED, mode)
+                : TDMKitManager.getKitCosts(mapName, primaryPool, mode);
+        ItemStack[][] redPreviews = ffa ? TDMKitManager.getKitPreviews(mapName, Team.RED, mode)
+                : TDMKitManager.getKitPreviews(mapName, primaryPool, mode);
+        String[] blueNames = ffa ? TDMKitManager.getKitNames(mapName, Team.BLUE, mode) : new String[0];
+        int[] blueCosts = ffa ? TDMKitManager.getKitCosts(mapName, Team.BLUE, mode) : new int[0];
+        ItemStack[][] bluePreviews = ffa ? TDMKitManager.getKitPreviews(mapName, Team.BLUE, mode)
                 : new ItemStack[0][40];
         if (!economy) {
             Arrays.fill(redCosts, 0);
@@ -1832,23 +2067,25 @@ public class TDMManager {
             }
         }
         String mapName = getSelectedMap(player.worldObj);
-        int savedCost = TDMKitManager.getKitCost(mapName, pool, kitIndex);
+        TDMGameMode activeMode = getGameMode(player.worldObj);
+        int savedCost = TDMKitManager.getKitCost(mapName, pool, activeMode, kitIndex);
         if (savedCost < 0) {
             return KitSelectionResult.INVALID_SELECTION;
         }
         TDMMap map = getSelectedMapData(player.worldObj);
         int effectiveCost = context != KitSelectionContext.LOADOUT_SELECTION
-                && map != null && map.mode == TDMGameMode.BOMB && map.buyScoreEnabled ? savedCost : 0;
+                && map != null && isBombMode(player.worldObj) && map.buyScoreEnabled ? savedCost : 0;
         if (getBuyScore(player) < effectiveCost) {
             return KitSelectionResult.INSUFFICIENT_FUNDS;
         }
-        if (!TDMKitManager.applyKit(mapName, pool, kitIndex, player)) {
+        if (!TDMKitManager.applyKit(mapName, pool, activeMode, kitIndex, player)) {
             return KitSelectionResult.INVALID_SELECTION;
         }
         TDMPurchasableManager.applyPendingKillstreakRewards(player);
         // Survivor-kit state belongs exclusively to competitive BOMB purchases.
         if (context != KitSelectionContext.LOADOUT_SELECTION && isBombMode(player.worldObj)) {
-            selectedKits.put(playerKey, new SelectedKit(pool, kitIndex));
+            selectedKits.put(playerKey, new SelectedKit(pool, kitIndex,
+                    TDMKitManager.getAvailableKitIdentity(mapName, pool, TDMGameMode.BOMB, kitIndex)));
         }
         if (effectiveCost > 0) {
             TDMData data = TDMData.get(player.worldObj);
@@ -1893,7 +2130,7 @@ public class TDMManager {
 
     /** Re-resolves spatial state after a team mutation; no selected spawn or freeze anchor survives the old team. */
     public static void refreshPlayerPlacementAfterTeamChange(EntityPlayer player) {
-        if(player==null)return;
+        if(player==null||isFfaMode(player.worldObj))return;
         boolean waiting=isRoundWaiting(player);
         cancelKitSelection(player); selectedKits.remove(getPlayerKey(player)); survivorChoicePending.remove(getPlayerKey(player));
         releaseRoundWaiting(player); releaseGlobalBuyProtection(player); clearKitSelectionProtection(player);
@@ -1930,8 +2167,8 @@ public class TDMManager {
                     spawn.x + 0.5D,
                     spawn.y,
                     spawn.z + 0.5D,
-                    playerMP.rotationYaw,
-                    playerMP.rotationPitch
+                    spawn.hasRotation ? spawn.yaw : playerMP.rotationYaw,
+                    spawn.hasRotation ? spawn.pitch : playerMP.rotationPitch
             );
         } else if (player.dimension == spawn.dim) {
             player.setPositionAndUpdate(spawn.x + 0.5D, spawn.y, spawn.z + 0.5D);
@@ -2001,12 +2238,9 @@ public class TDMManager {
         List<SpawnPoint> valid = new ArrayList<SpawnPoint>();
         TDMMap selected = data.maps.get(data.selectedMap);
 
-        if (selected != null && !selected.spawns.isEmpty()) {
-            addValidSpawns(valid, selected.spawns, team);
-        } else {
-            // Legacy global spawns remain compatible only for maps with no map-specific data.
-            addValidSpawns(valid, data.spawns, team);
-        }
+        // A remembered RED/BLUE team never changes the spawn category of an FFA match.
+        if (data.selectedMode == TDMGameMode.FFA) team = null;
+        if (selected != null) addValidSpawns(valid, resolvedSpawns(data, selected, data.selectedMode), team);
 
         if (valid.isEmpty()) {
             return null;
@@ -2022,5 +2256,10 @@ public class TDMManager {
                 valid.add(spawn);
             }
         }
+    }
+    private static List<SpawnPoint> resolvedSpawns(TDMData data, TDMMap map, TDMGameMode mode) {
+        List<SpawnPoint> source = map.resolvedSpawns(mode);
+        // Pre-map global spawns are a compatibility fallback for the original mode only.
+        return source.isEmpty() && mode == map.legacyGlobalSpawnMode ? data.spawns : source;
     }
 }

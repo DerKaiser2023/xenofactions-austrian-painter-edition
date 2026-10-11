@@ -84,6 +84,8 @@ public class ClientProxy extends ServerProxy
 	public static KeyBinding tdmMenu = new KeyBinding("key.hfr.tdmmenu", Keyboard.KEY_L, "key.categories.hfr.xenofactions");
 	public static KeyBinding tdmBuyMenu = new KeyBinding("key.hfr.tdmbuy", Keyboard.KEY_B, "key.categories.hfr.xenofactions");
 	public static KeyBinding xenofactionsMenu = new KeyBinding("key.hfr.xfmenu", Keyboard.KEY_K, "key.categories.hfr.xenofactions");
+	public static KeyBinding adminEditor = new KeyBinding("key.hfr.admineditor", Keyboard.KEY_F10, "key.categories.hfr.xenofactions");
+	public static KeyBinding borderVisuals = new KeyBinding("key.hfr.bordervisuals", Keyboard.KEY_RMENU, "key.categories.hfr.xenofactions");
 	
 	@Override
 	public void registerRenderInfo()
@@ -118,6 +120,8 @@ public class ClientProxy extends ServerProxy
 		ClientRegistry.registerKeyBinding(tdmMenu);
 		ClientRegistry.registerKeyBinding(tdmBuyMenu);
 		ClientRegistry.registerKeyBinding(xenofactionsMenu);
+		ClientRegistry.registerKeyBinding(adminEditor);
+		ClientRegistry.registerKeyBinding(borderVisuals);
 		
 		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityMachineRadar.class, new RenderRadar());
 		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityForceField.class, new RenderMachineForceField());
@@ -304,6 +308,7 @@ public class ClientProxy extends ServerProxy
 			
 		/// CLOWDER BORDER ///
 		case SFX_BORDER:
+			if(!com.hfr.client.journeymap.ClientBorderVisuals.enabled()) return;
 			if(!(payload instanceof int[]))
 				return;
 			
@@ -330,12 +335,14 @@ public class ClientProxy extends ServerProxy
 			if(part == 2)
 				a = 1;*/
 			
-			int a = 1;
+			int a = Math.max(1, Math.min(16,
+					(int)Math.ceil(Math.max(Math.abs((long)x2 - x1), Math.abs((long)z2 - z1)) / 6D)));
 			
 			for(int i = 0; i < a; i++) {
-				double xs = x1 + (x2 - x1) * world.rand.nextDouble();
-				double zs = z1 + (z2 - z1) * world.rand.nextDouble();
-				double ys = world.getHeightValue((int)xs, (int)zs - 1) + 0.25;// + 1.5D + world.rand.nextGaussian();
+				double along = (i + world.rand.nextDouble()) / a;
+				double xs = x1 + ((long)x2 - x1) * along;
+				double zs = z1 + ((long)z2 - z1) * along;
+				double ys = world.getHeightValue((int)Math.floor(xs), (int)Math.floor(zs - 0.01D)) + 0.25D;
 				
 				/*EntityReddustFX fx = new EntityReddustFX(world, xs, ys, zs, r, g, b);
 				fx.motionY = 0.1;

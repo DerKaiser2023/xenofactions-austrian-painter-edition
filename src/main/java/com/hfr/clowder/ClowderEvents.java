@@ -762,7 +762,7 @@ if(!player.inventory.hasItem(ModItems.debug) && MainRegistry.disableChests && (o
 		if(!name.equals(past)) {
 
 			if(owner.zone == Zone.FACTION) {
-				String title = meta == null ? "" : meta.name;
+				String title = (meta == null || !meta.isCityClaim()) ? "Wilderness" : meta.name;
 				PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(owner.owner, title), (EntityPlayerMP) player);
 				
 				Clowder mine = Clowder.getClowderFromPlayer(player);

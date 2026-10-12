@@ -204,7 +204,7 @@ public class TileEntityFlag extends TileEntityMachineBase implements ITerritoryP
 			
 			if(prev != 1F && height == 1F) {
 				this.worldObj.playSoundEffect(this.xCoord, this.yCoord, this.zCoord, "hfr:block.flagHoist", 3.0F, 1.0F);
-				MainRegistry.logger.info("Hoisintg flag " + xCoord + " " + yCoord + " " + zCoord + "!");
+				MainRegistry.logger.info("Hoisting flag " + xCoord + " " + yCoord + " " + zCoord + "!");
 				generateClaim();
 			}
 			

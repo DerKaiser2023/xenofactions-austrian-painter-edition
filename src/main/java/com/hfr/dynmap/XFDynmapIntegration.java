@@ -2,9 +2,14 @@ package com.hfr.dynmap;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import com.hfr.clowder.Clowder;
@@ -284,20 +289,190 @@ public class XFDynmapIntegration {
 	}
 
 	private static void createZoneMarkers() throws Exception {
+		Map<Integer, Map<Zone, Set<CoordPair>>> zonesByDim = new HashMap();
 		for(Map.Entry<CoordPair, TerritoryMeta> entry : ClowderTerritory.territories.entrySet()) {
 			CoordPair coord = entry.getKey(); TerritoryMeta meta = entry.getValue();
 			if(coord == null || meta == null || meta.owner == null) continue;
 			Zone zone = meta.owner.zone;
 			if(zone != Zone.SAFEZONE && zone != Zone.WARZONE) continue;
-			String worldName = getWorldName(coord.dimensionId);
+			Map<Zone, Set<CoordPair>> zoneMap = zonesByDim.computeIfAbsent(coord.dimensionId, k -> new HashMap());
+			Set<CoordPair> chunks = zoneMap.computeIfAbsent(zone, k -> new HashSet());
+			chunks.add(coord);
+		}
+
+		for(Map.Entry<Integer, Map<Zone, Set<CoordPair>>> dimEntry : zonesByDim.entrySet()) {
+			int dim = dimEntry.getKey();
+			String worldName = getWorldName(dim);
 			if(worldName == null || worldName.isEmpty()) continue;
-			int color = zone == Zone.SAFEZONE ? ClowderTerritory.SAFEZONE_COLOR : ClowderTerritory.WARZONE_COLOR;
-			TerritoryCoordinateBounds.Bounds x = TerritoryCoordinateBounds.forCoordinate(coord.x);
-			TerritoryCoordinateBounds.Bounds z = TerritoryCoordinateBounds.forCoordinate(coord.z);
-			area("xf_zone_" + coord.dimensionId + "_" + coord.x + "_" + coord.z,
-					zone == Zone.SAFEZONE ? "Safezone" : "Warzone", worldName,
-					x.minInclusive, z.minInclusive, x.maxExclusive, z.maxExclusive,
-					color, 0.16D, 64D, 64D);
+			for(Map.Entry<Zone, Set<CoordPair>> zoneEntry : dimEntry.getValue().entrySet()) {
+				Zone zone = zoneEntry.getKey();
+				Set<CoordPair> chunks = zoneEntry.getValue();
+				int color = zone == Zone.SAFEZONE ? ClowderTerritory.SAFEZONE_COLOR : ClowderTerritory.WARZONE_COLOR;
+				String zoneName = zone == Zone.SAFEZONE ? "Safezone" : "Warzone";
+
+				List<Set<CoordPair>> components = findConnectedComponents(chunks);
+				for(int i = 0; i < components.size(); i++) {
+					Set<CoordPair> component = components.get(i);
+					double[][] polygon = computePolygonOutline(component);
+					if(polygon != null && polygon.length >= 3) {
+						String markerId = "xf_zone_" + dim + "_" + zone.name().toLowerCase() + "_" + i;
+						createPolygonArea(markerId, zoneName, worldName, polygon, color, 0.16D, 64D, 64D);
+					}
+				}
+			}
+		}
+	}
+
+	private static List<Set<CoordPair>> findConnectedComponents(Set<CoordPair> chunks) {
+		Set<CoordPair> visited = new HashSet();
+		List<Set<CoordPair>> components = new ArrayList();
+		for(CoordPair start : chunks) {
+			if(visited.contains(start)) continue;
+			Set<CoordPair> component = new HashSet();
+			Deque<CoordPair> queue = new ArrayDeque();
+			queue.add(start);
+			visited.add(start);
+			while(!queue.isEmpty()) {
+				CoordPair current = queue.poll();
+				component.add(current);
+				for(CoordPair neighbor : getNeighbors(current)) {
+					if(chunks.contains(neighbor) && !visited.contains(neighbor)) {
+						visited.add(neighbor);
+						queue.add(neighbor);
+					}
+				}
+			}
+			components.add(component);
+		}
+		return components;
+	}
+
+	private static List<CoordPair> getNeighbors(CoordPair coord) {
+		List<CoordPair> neighbors = new ArrayList(4);
+		neighbors.add(new CoordPair(coord.dimensionId, coord.x - 1, coord.z));
+		neighbors.add(new CoordPair(coord.dimensionId, coord.x + 1, coord.z));
+		neighbors.add(new CoordPair(coord.dimensionId, coord.x, coord.z - 1));
+		neighbors.add(new CoordPair(coord.dimensionId, coord.x, coord.z + 1));
+		return neighbors;
+	}
+
+	private static double[][] computePolygonOutline(Set<CoordPair> chunks) {
+		if(chunks.isEmpty()) return null;
+
+		Map<Edge, Integer> edgeCount = new HashMap();
+		for(CoordPair chunk : chunks) {
+			double x1 = chunk.x * 16.0;
+			double z1 = chunk.z * 16.0;
+			double x2 = (chunk.x + 1) * 16.0;
+			double z2 = (chunk.z + 1) * 16.0;
+
+			Edge bottom = new Edge(x1, z1, x2, z1);
+			Edge top = new Edge(x1, z2, x2, z2);
+			Edge left = new Edge(x1, z1, x1, z2);
+			Edge right = new Edge(x2, z1, x2, z2);
+
+			incrementEdge(edgeCount, bottom);
+			incrementEdge(edgeCount, top);
+			incrementEdge(edgeCount, left);
+			incrementEdge(edgeCount, right);
+		}
+
+		List<Edge> boundaryEdges = new ArrayList();
+		for(Map.Entry<Edge, Integer> entry : edgeCount.entrySet()) {
+			if(entry.getValue() == 1) {
+				boundaryEdges.add(entry.getKey());
+			}
+		}
+
+		if(boundaryEdges.isEmpty()) return null;
+
+		Map<Point, List<Edge>> adjacency = new HashMap();
+		for(Edge edge : boundaryEdges) {
+			Point p1 = new Point(edge.x1, edge.z1);
+			Point p2 = new Point(edge.x2, edge.z2);
+			adjacency.computeIfAbsent(p1, k -> new ArrayList()).add(edge);
+			adjacency.computeIfAbsent(p2, k -> new ArrayList()).add(edge);
+		}
+
+		Point start = boundaryEdges.get(0).x1 < boundaryEdges.get(0).x2 
+			? new Point(boundaryEdges.get(0).x1, boundaryEdges.get(0).z1)
+			: new Point(boundaryEdges.get(0).x2, boundaryEdges.get(0).z2);
+
+		List<Point> polygon = new ArrayList();
+		Point current = start;
+		Edge prevEdge = null;
+		do {
+			polygon.add(current);
+			List<Edge> edges = adjacency.get(current);
+			Edge nextEdge = null;
+			for(Edge e : edges) {
+				if(e != prevEdge) {
+					nextEdge = e;
+					break;
+				}
+			}
+			if(nextEdge == null) break;
+			current = new Point(nextEdge.x1 == current.x && nextEdge.z1 == current.z 
+				? nextEdge.x2 : nextEdge.x1, 
+				nextEdge.z1 == current.z && nextEdge.x1 == current.x 
+					? nextEdge.z2 : nextEdge.z1);
+			prevEdge = nextEdge;
+		} while(!current.equals(start) && polygon.size() < boundaryEdges.size() + 1);
+
+		double[][] result = new double[2][polygon.size()];
+		for(int i = 0; i < polygon.size(); i++) {
+			result[0][i] = polygon.get(i).x;
+			result[1][i] = polygon.get(i).z;
+		}
+		return result;
+	}
+
+	private static void incrementEdge(Map<Edge, Integer> map, Edge edge) {
+		Edge normalized = edge.normalized();
+		map.put(normalized, map.getOrDefault(normalized, 0) + 1);
+	}
+
+	private static void createPolygonArea(String id, String label, String worldName, double[][] polygon, int color, double opacity, double y1, double y2) throws Exception {
+		Object marker = createAreaMarkerMethod.invoke(markerSet, id, label, Boolean.TRUE, worldName, polygon[0], polygon[1], Boolean.FALSE);
+		if(marker == null) return;
+		Method line = marker.getClass().getMethod("setLineStyle", int.class, double.class, int.class); line.setAccessible(true);
+		Method fill = marker.getClass().getMethod("setFillStyle", double.class, int.class); fill.setAccessible(true);
+		Method range = marker.getClass().getMethod("setRangeY", double.class, double.class); range.setAccessible(true);
+		line.invoke(marker, Integer.valueOf(2), Double.valueOf(0.85D), Integer.valueOf(color));
+		fill.invoke(marker, Double.valueOf(opacity), Integer.valueOf(color));
+		range.invoke(marker, Double.valueOf(y1), Double.valueOf(y2));
+	}
+
+	private static class Edge {
+		final double x1, z1, x2, z2;
+		Edge(double x1, double z1, double x2, double z2) {
+			this.x1 = x1; this.z1 = z1; this.x2 = x2; this.z2 = z2;
+		}
+		Edge normalized() {
+			if(x1 < x2 || (x1 == x2 && z1 < z2)) return this;
+			return new Edge(x2, z2, x1, z1);
+		}
+		@Override public boolean equals(Object o) {
+			if(!(o instanceof Edge)) return false;
+			Edge e = (Edge)o;
+			return Double.compare(x1, e.x1) == 0 && Double.compare(z1, e.z1) == 0 
+				&& Double.compare(x2, e.x2) == 0 && Double.compare(z2, e.z2) == 0;
+		}
+		@Override public int hashCode() {
+			return Objects.hash(x1, z1, x2, z2);
+		}
+	}
+
+	private static class Point {
+		final double x, z;
+		Point(double x, double z) { this.x = x; this.z = z; }
+		@Override public boolean equals(Object o) {
+			if(!(o instanceof Point)) return false;
+			Point p = (Point)o;
+			return Double.compare(x, p.x) == 0 && Double.compare(z, p.z) == 0;
+		}
+		@Override public int hashCode() {
+			return Objects.hash(x, z);
 		}
 	}
 

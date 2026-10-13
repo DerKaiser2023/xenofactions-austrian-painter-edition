@@ -895,12 +895,16 @@ public class Clowder {
 		else if(p < 1750)
 			n += " - City-State";
 		else if(p < 2750)
-			n += " - Sheikhdom";
+			n += " - County";
 		else if(p < 4000)
-			n += " - Emirate";
-		else if(p < 6000)
-			n += " - Sultanate";
+			n += " - Duchy";
+		else if(p < 5500)
+			n += " - Principality";
+		else if(p < 7000)
+			n += " - Kingdom";
 		else if(p < 8500)
+			n += " - Grand Kingdom";
+		else if(p < 10000)
 			n += " - Empire";
 		else
 			n += " - Caliphate";

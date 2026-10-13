@@ -234,6 +234,9 @@ public class Clowder {
 	private float prestige = 0;
 	private float prestigeGen = 0;
 	private float prestigeReq = 0;
+
+	/** Selected prestige title system. Default is the European ladder. */
+	public String titleSystem = "european";
 	private float fabricateTime = 0;
 	private float canDeclareTime = 0;
 	private float warTime = 0;
@@ -886,30 +889,49 @@ public class Clowder {
 			n += " - Bankrupt State";
 		else if(p < 100)
 			n += " - Unorganized Mob";
-		else if(p < 250)
-			n += " - Clan";
-		else if(p < 500)
-			n += " - Tribe";
-		else if(p < 1000)
-			n += " - Chiefdom";
-		else if(p < 1750)
-			n += " - City-State";
-		else if(p < 2750)
-			n += " - County";
-		else if(p < 4000)
-			n += " - Duchy";
-		else if(p < 5500)
-			n += " - Principality";
-		else if(p < 7000)
-			n += " - Kingdom";
-		else if(p < 8500)
-			n += " - Grand Kingdom";
-		else if(p < 10000)
-			n += " - Empire";
 		else
-			n += " - Caliphate";
+			n += " - " + getPrestigeTitle(p);
 
 		return n;
+	}
+
+	/** Returns the prestige title for the given prestige value, honoring the selected title system. */
+	public String getPrestigeTitle(float p) {
+		switch(titleSystem == null ? "european" : titleSystem.toLowerCase()) {
+		case "middleeastern":
+		case "middle_eastern":
+		case "islamic":
+			return getMiddleEasternTitle(p);
+		case "european":
+		default:
+			return getEuropeanTitle(p);
+		}
+	}
+
+	public static String getEuropeanTitle(float p) {
+		if(p < 250) return "Clan";
+		if(p < 500) return "Tribe";
+		if(p < 1000) return "Chiefdom";
+		if(p < 1750) return "City-State";
+		if(p < 2750) return "County";
+		if(p < 4000) return "Duchy";
+		if(p < 5500) return "Principality";
+		if(p < 7000) return "Kingdom";
+		if(p < 8500) return "Grand Kingdom";
+		if(p < 10000) return "Empire";
+		return "Caliphate";
+	}
+
+	public static String getMiddleEasternTitle(float p) {
+		if(p < 250) return "Clan";
+		if(p < 500) return "Tribe";
+		if(p < 1000) return "Chiefdom";
+		if(p < 1750) return "City-State";
+		if(p < 2750) return "Sheikhdom";
+		if(p < 4000) return "Emirate";
+		if(p < 6000) return "Sultanate";
+		if(p < 8500) return "Empire";
+		return "Caliphate";
 	}
 
 	public boolean vassalize(World world, String Master, String Vassal) {
@@ -1839,6 +1861,7 @@ public class Clowder {
 		nbt.setBoolean(i + "_canChange", canChangeColour);
 		nbt.setBoolean(i + "_canDisband", canDisband);
 		nbt.setString(i + "_customFlagHash", this.customFlagHash == null ? "" : this.customFlagHash);
+		nbt.setString(i + "_titleSystem", this.titleSystem == null ? "european" : this.titleSystem);
 		nbt.setInteger(i + "_homeX", this.homeX);
 		nbt.setInteger(i + "_homeY", this.homeY);
 		nbt.setInteger(i + "_homeZ", this.homeZ);
@@ -2034,6 +2057,7 @@ public class Clowder {
 		c.canChangeColour = nbt.getBoolean(i + "_canChange");
 		c.canDisband = nbt.getBoolean(i + "_canDisband");
 		c.customFlagHash = nbt.getString(i + "_customFlagHash");
+		c.titleSystem = nbt.hasKey(i + "_titleSystem") ? nbt.getString(i + "_titleSystem") : "european";
 		c.homeX = nbt.getInteger(i + "_homeX");
 		c.homeY = nbt.getInteger(i + "_homeY");
 		c.homeZ = nbt.getInteger(i + "_homeZ");

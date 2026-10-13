@@ -246,6 +246,7 @@ public class CommandClowder extends CommandBase {
 		if(cmd.equals("surrender")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdSurrender(sender, joinArgs(args, 1)); return; }
 		if(cmd.equals("acceptsurrender")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdAcceptSurrender(sender, joinArgs(args, 1)); return; }
 		if(cmd.equals("defendally")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdDefendAlly(sender, joinArgs(args, 1)); return; }
+		if(cmd.equals("title")) { cmdTitle(sender, args); return; }
 
 		sender.addChatMessage(new ChatComponentText(ERROR + "Unknown command. Usage: " + getCommandUsage(sender)));
 	}
@@ -296,6 +297,7 @@ public class CommandClowder extends CommandBase {
 		if(cmd.equals("surrender")) return "/c surrender <faction>";
 		if(cmd.equals("acceptsurrender")) return "/c acceptsurrender <faction>";
 		if(cmd.equals("defendally")) return "/c defendally <ally>";
+		if(cmd.equals("title")) return "/c title [european|middleeastern]";
 		if(cmd.equals("enemy")) return "/c enemy <faction>";
 		if(cmd.equals("unenemy")) return "/c unenemy <faction>";
 		if(cmd.equals("stonedrops")) return "/c stonedrops [page]";
@@ -373,6 +375,7 @@ public class CommandClowder extends CommandBase {
 		if(p == 5) {
 			sender.addChatMessage(new ChatComponentText(TITLE + "Prestige, alliances & merges"));
 			sender.addChatMessage(new ChatComponentText(COMMAND + "-balance" + TITLE + " - Shows faction prestige"));
+			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-title [european|middleeastern]" + TITLE + " - Changes the faction prestige title system"));
 			sender.addChatMessage(new ChatComponentText(COMMAND + "-deposit <amount>" + TITLE + " - Turns prestige items into digiprestige"));
 			sender.addChatMessage(new ChatComponentText(COMMAND + "-withdraw <amount>" + TITLE + " - Withdraws digiprestige as prestige items"));
 			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-befriend <faction|player>" + TITLE + " - Sends an alliance offer"));

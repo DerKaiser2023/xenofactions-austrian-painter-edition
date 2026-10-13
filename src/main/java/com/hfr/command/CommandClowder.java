@@ -297,7 +297,7 @@ public class CommandClowder extends CommandBase {
 		if(cmd.equals("surrender")) return "/c surrender <faction>";
 		if(cmd.equals("acceptsurrender")) return "/c acceptsurrender <faction>";
 		if(cmd.equals("defendally")) return "/c defendally <ally>";
-		if(cmd.equals("title")) return "/c title [european|middleeastern]";
+		if(cmd.equals("title")) return "/c title [european|middleeastern|turkic|persian|republican]";
 		if(cmd.equals("enemy")) return "/c enemy <faction>";
 		if(cmd.equals("unenemy")) return "/c unenemy <faction>";
 		if(cmd.equals("stonedrops")) return "/c stonedrops [page]";
@@ -1634,7 +1634,7 @@ private void cmdCreate(ICommandSender sender, String name) {
 		if(args.length < 2) {
 			sender.addChatMessage(new ChatComponentText(TITLE + "Current title system: " + clowder.titleSystem));
 			sender.addChatMessage(new ChatComponentText(TITLE + "Current title: " + clowder.getDecoratedName()));
-			sender.addChatMessage(new ChatComponentText(INFO + "Usage: /c title [european|middleeastern]"));
+			sender.addChatMessage(new ChatComponentText(INFO + "Usage: /c title [european|middleeastern|turkic|persian|republican]"));
 			return;
 		}
 
@@ -1653,8 +1653,25 @@ private void cmdCreate(ICommandSender sender, String name) {
 		case "middleeast":
 			system = "middleeastern";
 			break;
+		case "turkic":
+		case "mongol":
+		case "steppe":
+		case "turk":
+			system = "turkic";
+			break;
+		case "persian":
+		case "iranian":
+		case "persianate":
+		case "iran":
+			system = "persian";
+			break;
+		case "republican":
+		case "republic":
+		case "republics":
+			system = "republican";
+			break;
 		default:
-			sender.addChatMessage(new ChatComponentText(ERROR + "Unknown title system. Use european or middleeastern."));
+			sender.addChatMessage(new ChatComponentText(ERROR + "Unknown title system. Use european, middleeastern, turkic, persian, or republican."));
 			return;
 		}
 

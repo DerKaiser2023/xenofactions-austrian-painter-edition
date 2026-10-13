@@ -236,6 +236,7 @@ public class Clowder {
 	private float prestigeReq = 0;
 
 	/** Selected prestige title system. Default is the European ladder. */
+	// also the prestige title was retarded. prob bc i wasnt a muslim. idk maybe im just a retarded american.
 	public String titleSystem = "european";
 	private float fabricateTime = 0;
 	private float canDeclareTime = 0;
@@ -902,12 +903,24 @@ public class Clowder {
 		case "middle_eastern":
 		case "islamic":
 			return getMiddleEasternTitle(p);
+		case "turkic":
+		case "mongol":
+		case "steppe":
+			return getTurkicTitle(p);
+		case "persian":
+		case "iranian":
+		case "persianate":
+			return getPersianTitle(p);
+		case "republican":
+		case "republic":
+			return getRepublicanTitle(p);
 		case "european":
 		default:
 			return getEuropeanTitle(p);
 		}
 	}
 
+	// peak shit
 	public static String getEuropeanTitle(float p) {
 		if(p < 250) return "Clan";
 		if(p < 500) return "Tribe";
@@ -922,6 +935,7 @@ public class Clowder {
 		return "Caliphate";
 	}
 
+	//stupid retardedly named islamic titles
 	public static String getMiddleEasternTitle(float p) {
 		if(p < 250) return "Clan";
 		if(p < 500) return "Tribe";
@@ -932,6 +946,42 @@ public class Clowder {
 		if(p < 6000) return "Sultanate";
 		if(p < 8500) return "Empire";
 		return "Caliphate";
+	}
+
+	// why did i add this
+	public static String getTurkicTitle(float p) {
+		if(p < 250) return "Clan";
+		if(p < 500) return "Tribe";
+		if(p < 1000) return "Chiefdom";
+		if(p < 1750) return "Khanate";
+		if(p < 3500) return "Great Khanate";
+		if(p < 6000) return "Khaganate";
+		if(p < 9000) return "Empire";
+		return "Great Khaganate";
+	}
+
+	// fuck you persians oh i mean iranians fuck off
+	public static String getPersianTitle(float p) {
+		if(p < 250) return "Clan";
+		if(p < 500) return "Tribe";
+		if(p < 1000) return "Chiefdom";
+		if(p < 1750) return "Satrapy";
+		if(p < 3500) return "Principality";
+		if(p < 6000) return "Shahdom";
+		if(p < 8500) return "Shahanshahate";
+		return "Empire";
+	}
+
+	// EW REPUBLICS UGH
+	public static String getRepublicanTitle(float p) {
+		if(p < 250) return "Clan";
+		if(p < 500) return "Tribe";
+		if(p < 1000) return "Settlement";
+		if(p < 1750) return "City-State";
+		if(p < 3500) return "Republic";
+		if(p < 6000) return "Grand Republic";
+		if(p < 8500) return "Hegemony";
+		return "Empire";
 	}
 
 	public boolean vassalize(World world, String Master, String Vassal) {

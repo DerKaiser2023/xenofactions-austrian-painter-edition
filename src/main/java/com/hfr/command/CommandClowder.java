@@ -1616,6 +1616,55 @@ private void cmdCreate(ICommandSender sender, String name) {
 		}
 	}
 
+	private void cmdTitle(ICommandSender sender, String[] args) {
+
+		EntityPlayer player = getCommandSenderAsPlayer(sender);
+		Clowder clowder = Clowder.getClowderFromPlayer(player);
+
+		if(clowder == null) {
+			sender.addChatMessage(new ChatComponentText(ERROR + "You are not in any faction!"));
+			return;
+		}
+
+		if(clowder.getPermLevel(player) <= 2) {
+			sender.addChatMessage(new ChatComponentText(ERROR + "Only faction leaders can change the title system!"));
+			return;
+		}
+
+		if(args.length < 2) {
+			sender.addChatMessage(new ChatComponentText(TITLE + "Current title system: " + clowder.titleSystem));
+			sender.addChatMessage(new ChatComponentText(TITLE + "Current title: " + clowder.getDecoratedName()));
+			sender.addChatMessage(new ChatComponentText(INFO + "Usage: /c title [european|middleeastern]"));
+			return;
+		}
+
+		String requested = args[1].toLowerCase();
+		String system;
+		switch(requested) {
+		case "european":
+		case "eu":
+			system = "european";
+			break;
+		case "middleeastern":
+		case "middle_eastern":
+		case "me":
+		case "islamic":
+		case "arab":
+		case "middleeast":
+			system = "middleeastern";
+			break;
+		default:
+			sender.addChatMessage(new ChatComponentText(ERROR + "Unknown title system. Use european or middleeastern."));
+			return;
+		}
+
+		clowder.titleSystem = system;
+		clowder.save(player.worldObj);
+		sender.addChatMessage(new ChatComponentText(TITLE + "Title system changed to " + system + "!"));
+		sender.addChatMessage(new ChatComponentText(TITLE + "Your faction is now: " + clowder.getDecoratedName()));
+		PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(clowder, ""), (EntityPlayerMP) player);
+	}
+
 	private void cmdBalance(ICommandSender sender) {
 
 		EntityPlayer player = getCommandSenderAsPlayer(sender);

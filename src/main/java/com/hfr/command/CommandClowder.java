@@ -241,6 +241,8 @@ public class CommandClowder extends CommandBase {
 			return;
 		}
 		if(cmd.equals("acceptpeace")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdAcceptPeace(sender, joinArgs(args, 1)); return; }
+		if(cmd.equals("vassal")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdVassal(sender, joinArgs(args, 1)); return; }
+		if(cmd.equals("releasevassal")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdReleaseVassal(sender, joinArgs(args, 1)); return; }
 		if(cmd.equals("ceasefire")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdRequestCeasefire(sender, joinArgs(args, 1)); return; }
 		if(cmd.equals("acceptceasefire")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdAcceptCeasefire(sender, joinArgs(args, 1)); return; }
 		if(cmd.equals("surrender")) { if(!requireArgs(sender, cmd, args, 2)) return; cmdSurrender(sender, joinArgs(args, 1)); return; }
@@ -297,6 +299,8 @@ public class CommandClowder extends CommandBase {
 		if(cmd.equals("surrender")) return "/c surrender <faction>";
 		if(cmd.equals("acceptsurrender")) return "/c acceptsurrender <faction>";
 		if(cmd.equals("defendally")) return "/c defendally <ally>";
+		if(cmd.equals("vassal")) return "/c vassal <vassalize|release> <faction>";
+		if(cmd.equals("releasevassal")) return "/c releasevassal <faction>";
 		if(cmd.equals("title")) return "/c title [european|middleeastern|turkic|persian|republican]";
 		if(cmd.equals("enemy")) return "/c enemy <faction>";
 		if(cmd.equals("unenemy")) return "/c unenemy <faction>";
@@ -390,22 +394,24 @@ public class CommandClowder extends CommandBase {
 			sender.addChatMessage(new ChatComponentText(INFO + "/clowder help 6"));
 		}
 
-		if(p == 6) {
-			sender.addChatMessage(new ChatComponentText(TITLE + "War & related utility commands"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-declarewar <faction>" + TITLE + " - Declares war on another faction"));
-			sender.addChatMessage(new ChatComponentText(COMMAND + "-listwars" + TITLE + " - Lists your faction active wars"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-peace <faction> {city}" + TITLE + " - Proposes peace, optionally transferring a city"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-acceptpeace <faction>" + TITLE + " - Accepts a peace proposal"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-ceasefire <faction>" + TITLE + " - Proposes a ceasefire"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-acceptceasefire <faction>" + TITLE + " - Accepts a ceasefire"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-surrender <faction>" + TITLE + " - Offers surrender"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-acceptsurrender <faction>" + TITLE + " - Accepts enemy surrender"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-defendally <ally>" + TITLE + " - Joins an ally's active wars"));
-			sender.addChatMessage(new ChatComponentText(INFO + "/xmap for a claim map, /xflags for conquest flags, /xmulti for a multitool."));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-enemy <faction>" + TITLE + " - Marks a one-way enemy faction"));
-			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-unenemy <faction>" + TITLE + " - Starts the delayed enemy removal"));
-			sender.addChatMessage(new ChatComponentText(COMMAND + "-stonedrops {page}" + TITLE + " - Lists configured stone drops"));
-		}
+if(p == 6) {
+		sender.addChatMessage(new ChatComponentText(TITLE + "War & related utility commands"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-declarewar <faction>" + TITLE + " - Declares war on another faction"));
+		sender.addChatMessage(new ChatComponentText(COMMAND + "-listwars" + TITLE + " - Lists your faction active wars"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-peace <faction> {city}" + TITLE + " - Proposes peace, optionally transferring a city"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-acceptpeace <faction>" + TITLE + " - Accepts a peace proposal (stronger faction may vassalize loser)"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-ceasefire <faction>" + TITLE + " - Proposes a ceasefire"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-acceptceasefire <faction>" + TITLE + " - Accepts a ceasefire"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-surrender <faction>" + TITLE + " - Offers surrender"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-acceptsurrender <faction>" + TITLE + " - Accepts enemy surrender"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-defendally <ally>" + TITLE + " - Joins an ally's active wars"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-vassal vassalize <faction>" + TITLE + " - Make a weaker faction your vassal"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-vassal release <faction>" + TITLE + " - Release a vassal to independence"));
+		sender.addChatMessage(new ChatComponentText(INFO + "/xmap for a claim map, /xflags for conquest flags, /xmulti for a multitool."));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-enemy <faction>" + TITLE + " - Marks a one-way enemy faction"));
+		sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-unenemy <faction>" + TITLE + " - Starts the delayed enemy removal"));
+		sender.addChatMessage(new ChatComponentText(COMMAND + "-stonedrops {page}" + TITLE + " - Lists configured stone drops"));
+	}
 	}
 
 	
@@ -934,7 +940,15 @@ private void cmdCreate(ICommandSender sender, String name) {
 
 			if(Clowder.getClowderFromName(factionName) == null) {
 
-				if(clowder.getPermLevel(player) > 1) {
+				// Allow the suzerain's owner to rename a vassal if owner commands are delegated.
+				boolean canRename = clowder.getPermLevel(player) > 1;
+				if(!canRename && XFConfig.vassalOwnerCommandsDelegated && clowder.isVassal() && clowder.suzerain != null) {
+					if(clowder.suzerain.isOwner(player)) {
+						canRename = true;
+					}
+				}
+
+				if(canRename) {
 					clowder.rename(factionName, player);
 					sender.addChatMessage(new ChatComponentText(TITLE + "Renamed faction to " + factionName + "!"));
 					PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(clowder, ""), (EntityPlayerMP) player);
@@ -1223,7 +1237,15 @@ private void cmdCreate(ICommandSender sender, String name) {
 
 		if(clowder != null) {
 
-			if(clowder.getPermLevel(player) > 2 ) {
+			// Allow the suzerain's owner to change a vassal's flag if owner commands are delegated.
+			boolean canFlag = clowder.getPermLevel(player) > 2;
+			if(!canFlag && XFConfig.vassalOwnerCommandsDelegated && clowder.isVassal() && clowder.suzerain != null) {
+				if(clowder.suzerain.isOwner(player)) {
+					canFlag = true;
+				}
+			}
+
+			if(canFlag) {
 
 				String flag = args[1];
 				if(flag.equalsIgnoreCase("seturl")) {
@@ -1677,6 +1699,7 @@ private void cmdCreate(ICommandSender sender, String name) {
 
 		clowder.titleSystem = system;
 		clowder.save(player.worldObj);
+		clowder.syncTitleSystemToVassals(player.worldObj);
 		sender.addChatMessage(new ChatComponentText(TITLE + "Title system changed to " + system + "!"));
 		sender.addChatMessage(new ChatComponentText(TITLE + "Your faction is now: " + clowder.getDecoratedName()));
 		PacketDispatcher.wrapper.sendTo(new ClowderFlagPacket(clowder, ""), (EntityPlayerMP) player);
@@ -2260,6 +2283,16 @@ private void cmdCreate(ICommandSender sender, String name) {
 			long until = System.currentTimeMillis() + XFConfig.peaceCooldownMs;
 			me.noWarUntil.put(target.name, until); target.noWarUntil.put(me.name, until);
 		}
+
+		// Vassalization option: the stronger faction (by prestige) may vassalize the loser. did this bc fuck ragex, labjac, weeder, bob and other fucking RETARDS.
+		if(XFConfig.vassalSystemEnabled && !target.isVassal() && me.getPrestige() > target.getPrestige()
+				&& me.getPrestige() >= 0 && target.getPrestige() >= 0) {
+			me.vassalize(player.worldObj, me.name, target.name);
+			target.notifyAll(player.worldObj, new ChatComponentText(EnumChatFormatting.GOLD + "[VASSAL] " + me.name + " has made us their vassal as part of the peace treaty!"));
+			MinecraftServer.getServer().getConfigurationManager().sendChatMsg(new ChatComponentText(EnumChatFormatting.GOLD + "[VASSAL] " + target.name + " is now a vassal of " + me.name + " under the peace treaty!"));
+			sender.addChatMessage(new ChatComponentText(TITLE + "As part of the peace treaty, " + target.name + " is now your vassal!"));
+		}
+
 		MinecraftServer.getServer().getConfigurationManager().sendChatMsg(new ChatComponentText(EnumChatFormatting.GREEN + "[WAR] " + me.name + " and " + target.name + " have agreed to peace."));
 	}
 	private void cmdRequestCeasefire(ICommandSender sender, String targetName) {
@@ -2355,6 +2388,70 @@ private void cmdCreate(ICommandSender sender, String name) {
 		me.defendingAllies.add(ally.name);
 		ClowderData.getData(player.worldObj).markDirty();
 		sender.addChatMessage(new ChatComponentText(INFO + "Joined " + joined + " war(s) to defend ally " + ally.name + "."));
+	}
+
+// tel aviv is calling
+
+	private void cmdVassal(ICommandSender sender, String args) {
+		if(!XFConfig.vassalSystemEnabled) { sender.addChatMessage(new ChatComponentText(ERROR + "The vassal system is disabled on this server.")); return; }
+
+		EntityPlayer player = getCommandSenderAsPlayer(sender);
+		Clowder me = Clowder.getClowderFromPlayer(player);
+		if(me == null) { sender.addChatMessage(new ChatComponentText(ERROR + "You are not in any faction!")); return; }
+		if(me.getPermLevel(player) < 3) { sender.addChatMessage(new ChatComponentText(ERROR + "Only faction leaders can manage vassals!")); return; }
+
+		String[] parts = args.split("\\s+");
+		if(parts.length < 2) {
+			sender.addChatMessage(new ChatComponentText(TITLE + "Vassal management:"));
+			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-vassal vassalize <faction>" + TITLE + " - Make a faction your vassal"));
+			sender.addChatMessage(new ChatComponentText(COMMAND_LEADER + "-vassal release <faction>" + TITLE + " - Release a vassal to independence"));
+			if(!me.vassals.isEmpty()) {
+				sender.addChatMessage(new ChatComponentText(LIST + "Your vassals:"));
+				for(Clowder v : me.vassals) {
+					sender.addChatMessage(new ChatComponentText(LIST + " - " + v.name + " (" + Clowder.round(v.getPrestige()) + " prestige, " + v.getDecoratedName() + ")"));
+				}
+			}
+			return;
+		}
+
+		String sub = parts[0].toLowerCase();
+		String targetName = parts[1];
+		Clowder target = Clowder.getClowderFromName(targetName);
+		if(target == null) { sender.addChatMessage(new ChatComponentText(ERROR + "Faction not found: " + targetName)); return; }
+		if(target == me) { sender.addChatMessage(new ChatComponentText(ERROR + "You cannot vassalize yourself!")); return; }
+
+		if(sub.equals("vassalize")) {
+			if(target.isVassal()) { sender.addChatMessage(new ChatComponentText(ERROR + target.name + " is already a vassal of " + target.suzerain.name + "!")); return; }
+			if(me.getPrestige() <= target.getPrestige()) { sender.addChatMessage(new ChatComponentText(ERROR + "You must have more prestige than " + target.name + " to vassalize them!")); return; }
+			if(me.getPrestige() < 0 || target.getPrestige() < 0) { sender.addChatMessage(new ChatComponentText(ERROR + "Neither faction can be in bankruptcy!")); return; }
+
+			me.vassalize(player.worldObj, me.name, target.name);
+			target.notifyAll(player.worldObj, new ChatComponentText(EnumChatFormatting.GOLD + "[VASSAL] " + me.name + " has made us their vassal! We now send " + Math.round(XFConfig.vassalPrestigeTransferPercent * 100F) + "% of our prestige generation to them."));
+			MinecraftServer.getServer().getConfigurationManager().sendChatMsg(new ChatComponentText(EnumChatFormatting.GOLD + "[VASSAL] " + target.name + " is now a vassal of " + me.name + "!"));
+			sender.addChatMessage(new ChatComponentText(TITLE + target.name + " is now your vassal!"));
+		} else if(sub.equals("release")) {
+			if(!target.isVassal() || target.suzerain != me) { sender.addChatMessage(new ChatComponentText(ERROR + target.name + " is not your vassal!")); return; }
+			me.releaseVassal(player.worldObj, target.name);
+			target.notifyAll(player.worldObj, new ChatComponentText(EnumChatFormatting.YELLOW + "[VASSAL] We are no longer a vassal of " + me.name + "!"));
+			MinecraftServer.getServer().getConfigurationManager().sendChatMsg(new ChatComponentText(EnumChatFormatting.YELLOW + "[VASSAL] " + me.name + " has released " + target.name + " from vassalage."));
+			sender.addChatMessage(new ChatComponentText(TITLE + "Released " + target.name + " from vassalage!"));
+		} else {
+			sender.addChatMessage(new ChatComponentText(ERROR + "Unknown vassal subcommand. Use 'vassalize' or 'release'."));
+		}
+	}
+
+	private void cmdReleaseVassal(ICommandSender sender, String targetName) {
+		if(!XFConfig.vassalSystemEnabled) { sender.addChatMessage(new ChatComponentText(ERROR + "The vassal system is disabled on this server.")); return; }
+		EntityPlayer player = getCommandSenderAsPlayer(sender);
+		Clowder me = Clowder.getClowderFromPlayer(player);
+		Clowder target = Clowder.getClowderFromName(targetName);
+		if(me == null) { sender.addChatMessage(new ChatComponentText(ERROR + "You are not in any faction!")); return; }
+		if(me.getPermLevel(player) < 3) { sender.addChatMessage(new ChatComponentText(ERROR + "Only faction leaders can manage vassals!")); return; }
+		if(target == null) { sender.addChatMessage(new ChatComponentText(ERROR + "Faction not found: " + targetName)); return; }
+		if(!target.isVassal() || target.suzerain != me) { sender.addChatMessage(new ChatComponentText(ERROR + target.name + " is not your vassal!")); return; }
+		me.releaseVassal(player.worldObj, target.name);
+		target.notifyAll(player.worldObj, new ChatComponentText(EnumChatFormatting.YELLOW + "[VASSAL] We are no longer a vassal of " + me.name + "!"));
+		sender.addChatMessage(new ChatComponentText(TITLE + "Released " + target.name + " from vassalage!"));
 	}
 
 	@Override
@@ -2501,7 +2598,7 @@ private void cmdCreate(ICommandSender sender, String name) {
 				"listflags", "flag", "gracebuild", "sethome", "home", "setwarp", "addwarp", "delwarp", "warp", "warps",
                 "claim", "city", "capital", "nameclaim", "balance", "deposit", "withdraw", "befriend", "ally", "acceptfriend",
 				"acceptally", "unfriend", "unally", "setallywarp", "allywarp", "merge", "acceptmerge", "declarewar", "war", "listwars",
-				"peace", "acceptpeace", "ceasefire", "acceptceasefire", "surrender", "acceptsurrender", "defendally" };
+				"peace", "acceptpeace", "ceasefire", "acceptceasefire", "surrender", "acceptsurrender", "defendally", "vassal", "releasevassal" };
 	}
 
 	private boolean isPlayerCompletionCommand(String cmd) {
@@ -2514,7 +2611,7 @@ private void cmdCreate(ICommandSender sender, String name) {
 				|| cmd.equals("unfriend") || cmd.equals("unally") || cmd.equals("allywarp") || cmd.equals("merge")
 				|| cmd.equals("acceptmerge") || cmd.equals("declarewar") || cmd.equals("war") || cmd.equals("peace") || cmd.equals("acceptpeace")
 				|| cmd.equals("ceasefire") || cmd.equals("acceptceasefire") || cmd.equals("surrender")
-				|| cmd.equals("acceptsurrender") || cmd.equals("defendally");
+				|| cmd.equals("acceptsurrender") || cmd.equals("defendally") || cmd.equals("vassal") || cmd.equals("releasevassal");
 	}
 
 	private String[] getFactionCompletionNames() {

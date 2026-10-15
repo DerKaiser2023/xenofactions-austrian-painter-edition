@@ -88,6 +88,12 @@ public class Clowder {
 	//public Set<String> dickSuckers = new HashSet();
 	public String suzerainS = "nobody2584369";
 
+	/** Set of this faction's vassals (Clowder objects). Non-persistent; rebuilt from suzerainS on load. */
+	public transient Set<Clowder> vassals = new HashSet<Clowder>();
+
+	/** String set of vassal faction names for NBT persistence. */
+	public Set<String> vassalS = new HashSet<String>();
+
 	//for being a bitch
 	//public boolean bitch = false;
 
@@ -896,8 +902,17 @@ public class Clowder {
 		return n;
 	}
 
-	/** Returns the prestige title for the given prestige value, honoring the selected title system. */
+	/** Returns the prestige title for the given prestige value, honoring the selected title system.
+ *  Vassals are capped at a number of title levels below their suzerain. */
 	public String getPrestigeTitle(float p) {
+		if(isVassal()) {
+			int cap = getVassalTitleRankCap();
+			int rank = getTitleRankBySystem(titleSystem, p);
+			if(rank > cap) {
+				// Use the prestige threshold for the capped rank in the same title system.
+				p = getPremiereThresholdForRank(titleSystem, cap);
+			}
+		}
 		switch(titleSystem == null ? "european" : titleSystem.toLowerCase()) {
 		case "middleeastern":
 		case "middle_eastern":
@@ -917,6 +932,106 @@ public class Clowder {
 		case "european":
 		default:
 			return getEuropeanTitle(p);
+		}
+	}
+
+	/** Returns the minimum prestige required to reach the given title rank in the specified system. */
+	public static float getPremiereThresholdForRank(String system, int rank) {
+		if(system == null)
+			system = "european";
+		switch(system.toLowerCase()) {
+		case "middleeastern":
+		case "middle_eastern":
+		case "islamic":
+			return getMiddleEasternThreshold(rank);
+		case "turkic":
+		case "mongol":
+		case "steppe":
+			return getTurkicThreshold(rank);
+		case "persian":
+		case "iranian":
+		case "persianate":
+			return getPersianThreshold(rank);
+		case "republican":
+		case "republic":
+			return getRepublicanThreshold(rank);
+		case "european":
+		default:
+			return getEuropeanThreshold(rank);
+		}
+	}
+
+	public static float getEuropeanThreshold(int rank) {
+		switch(rank) {
+		case 0: return 0F;
+		case 1: return 250F;
+		case 2: return 500F;
+		case 3: return 1000F;
+		case 4: return 1750F;
+		case 5: return 2750F;
+		case 6: return 4000F;
+		case 7: return 5500F;
+		case 8: return 7000F;
+		case 9: return 8500F;
+		case 10: return 10000F;
+		default: return 10000F;
+		}
+	}
+
+	public static float getMiddleEasternThreshold(int rank) {
+		switch(rank) {
+		case 0: return 0F;
+		case 1: return 250F;
+		case 2: return 500F;
+		case 3: return 1000F;
+		case 4: return 1750F;
+		case 5: return 2750F;
+		case 6: return 4000F;
+		case 7: return 6000F;
+		case 8: return 8500F;
+		default: return 8500F;
+		}
+	}
+
+	public static float getTurkicThreshold(int rank) {
+		switch(rank) {
+		case 0: return 0F;
+		case 1: return 250F;
+		case 2: return 500F;
+		case 3: return 1000F;
+		case 4: return 1750F;
+		case 5: return 3500F;
+		case 6: return 6000F;
+		case 7: return 9000F;
+		default: return 9000F;
+		}
+	}
+
+	public static float getPersianThreshold(int rank) {
+		switch(rank) {
+		case 0: return 0F;
+		case 1: return 250F;
+		case 2: return 500F;
+		case 3: return 1000F;
+		case 4: return 1750F;
+		case 5: return 3500F;
+		case 6: return 6000F;
+		case 7: return 8500F;
+		default: return 8500F;
+		}
+	}
+
+	public static float getRepublicanThreshold(int rank) {
+		switch(rank) {
+		case 0: return 0F;
+		case 1: return 250F;
+		case 2: return 500F;
+		case 3: return 1000F;
+		case 4: return 1750F;
+		case 5: return 3500F;
+		case 6: return 6000F;
+		case 7: return 8500F;
+		default: return 8500F;
 		}
 	}
 
@@ -989,13 +1104,174 @@ public class Clowder {
 		if(getClowderFromName(Master) == null || getClowderFromName(Vassal) == null)
 			return false;
 
+		Clowder master = getClowderFromName(Master);
+		Clowder vassal = getClowderFromName(Vassal);
 
+		if(master == vassal)
+			return false;
 
-		getClowderFromName(Vassal).suzerainS = Master;
-		getClowderFromName(Vassal).suzerain = getClowderFromName(Master);
+		// Remove any existing suzerain relationship for the vassal first.
+		if(vassal.suzerain != null && vassal.suzerain != master) {
+			vassal.suzerain.vassalS.remove(vassal.name);
+			vassal.suzerain.vassals.remove(vassal);
+		}
+
+		vassal.suzerainS = Master;
+		vassal.suzerain = master;
+		master.vassalS.add(Vassal);
+		master.vassals.add(vassal);
+
+		// Sync title system from master to vassal.
+		vassal.titleSystem = master.titleSystem;
+
 		ClowderData.getData(world).markDirty();
 
 		return true;
+	}
+
+	/** Removes the vassal relationship, restoring independence. */
+	public boolean releaseVassal(World world, String VassalName) {
+
+		if(getClowderFromName(VassalName) == null)
+			return false;
+
+		Clowder vassal = getClowderFromName(VassalName);
+		if(vassal.suzerain == null)
+			return false;
+
+		Clowder master = vassal.suzerain;
+		master.vassalS.remove(vassal.name);
+		master.vassals.remove(vassal);
+		vassal.suzerain = null;
+		vassal.suzerainS = "nobody2584369";
+		ClowderData.getData(world).markDirty();
+
+		return true;
+	}
+
+	// TODO: adda revolt option bc i fucking hate my life
+
+	/** Returns the number of prestige title levels between two factions based on their current titles. */
+	public static int titleLevelDifference(Clowder a, Clowder b) {
+		if(a == null || b == null)
+			return Integer.MAX_VALUE;
+		return Math.abs(getTitleRank(a) - getTitleRank(b));
+	}
+
+	/** Returns the numeric rank of a faction's current prestige title. */
+	public static int getTitleRank(Clowder c) {
+		if(c == null)
+			return 0;
+		return getTitleRankBySystem(c.titleSystem, c.getPrestige());
+	}
+
+	/** Returns the numeric rank of a prestige title for the given system and prestige value. */
+	public static int getTitleRankBySystem(String system, float prestige) {
+		if(system == null)
+			system = "european";
+		switch(system.toLowerCase()) {
+		case "middleeastern":
+		case "middle_eastern":
+		case "islamic":
+			return getMiddleEasternTitleRank(prestige);
+		case "turkic":
+		case "mongol":
+		case "steppe":
+			return getTurkicTitleRank(prestige);
+		case "persian":
+		case "iranian":
+		case "persianate":
+			return getPersianTitleRank(prestige);
+		case "republican":
+		case "republic":
+			return getRepublicanTitleRank(prestige);
+		case "european":
+		default:
+			return getEuropeanTitleRank(prestige);
+		}
+	}
+
+	// call me a nazi liberals for liking my euro blood lands idgaf FUCK YOU ALLLLLLL
+	public static int getEuropeanTitleRank(float p) {
+		if(p < 250) return 0;
+		if(p < 500) return 1;
+		if(p < 1000) return 2;
+		if(p < 1750) return 3;
+		if(p < 2750) return 4;
+		if(p < 4000) return 5;
+		if(p < 5500) return 6;
+		if(p < 7000) return 7;
+		if(p < 8500) return 8;
+		if(p < 10000) return 9;
+		return 10;
+	}
+
+	// goat fuckers you follow a pedophile
+	public static int getMiddleEasternTitleRank(float p) {
+		if(p < 250) return 0;
+		if(p < 500) return 1;
+		if(p < 1000) return 2;
+		if(p < 1750) return 3;
+		if(p < 2750) return 4;
+		if(p < 4000) return 5;
+		if(p < 6000) return 6;
+		if(p < 8500) return 7;
+		return 8;
+	}
+
+	// fuck labjac
+	public static int getTurkicTitleRank(float p) {
+		if(p < 250) return 0;
+		if(p < 500) return 1;
+		if(p < 1000) return 2;
+		if(p < 1750) return 3;
+		if(p < 3500) return 4;
+		if(p < 6000) return 5;
+		if(p < 9000) return 6;
+		return 7;
+	}
+
+	// i hate iranians why do they exist
+	public static int getPersianTitleRank(float p) {
+		if(p < 250) return 0;
+		if(p < 500) return 1;
+		if(p < 1000) return 2;
+		if(p < 1750) return 3;
+		if(p < 3500) return 4;
+		if(p < 6000) return 5;
+		if(p < 8500) return 6;
+		return 7;
+	}
+
+	// ew republics are so fucking stupid
+	public static int getRepublicanTitleRank(float p) {
+		if(p < 250) return 0;
+		if(p < 500) return 1;
+		if(p < 1000) return 2;
+		if(p < 1750) return 3;
+		if(p < 3500) return 4;
+		if(p < 6000) return 5;
+		if(p < 8500) return 6;
+		return 7;
+	}
+
+	/** Returns the maximum title rank a vassal may reach given the suzerain's rank and the configured limit bc vassals are puppets and CANNOT be more powerful than the chuds */
+	public int getVassalTitleRankCap() {
+		if(suzerain == null)
+			return Integer.MAX_VALUE;
+		int suzerainRank = getTitleRank(suzerain);
+		int limit = XFConfig.vassalTitleLevelLimit;
+		return Math.max(0, suzerainRank - limit);
+	}
+
+	/** Returns true if this faction is a vassal of another faction. */
+	public boolean isVassal() {
+		return suzerain != null;
+	}
+
+	/** Returns true if this faction has at least one vassal. */
+	public boolean hasVassals() {
+		return !vassals.isEmpty();
 	}
 
 
@@ -1121,10 +1397,24 @@ public class Clowder {
 	public void becomeVassal(Clowder vassal, EntityPlayer player, Clowder suzerain) {
 
 		vassal.suzerain = suzerain;
+		vassal.suzerainS = suzerain.name;
+		vassal.titleSystem = suzerain.titleSystem;
+		suzerain.vassalS.add(vassal.name);
+		suzerain.vassals.add(vassal);
 
 		cleanEnemyRelationReferences(player.worldObj);
 		ClowderData.getData(player.worldObj).markDirty();
 		syncNameplateDataAll();
+	}
+
+	/** Propagate a title system change from this faction to all of its vassals. */
+	public void syncTitleSystemToVassals(World world) {
+		for(Clowder vassal : vassals) {
+			if(vassal != null && !vassal.titleSystem.equals(this.titleSystem)) {
+				vassal.titleSystem = this.titleSystem;
+				vassal.save(world);
+			}
+		}
 	}
 
 	// war declare system
@@ -1152,6 +1442,8 @@ public class Clowder {
 
 		return true;
 	}
+
+	// TODO: make vassal auto join suzerain wars bc chuds chuds chuds
 
 	public void promote(World world, String name) {
 		FactionMemberRecord record = findMemberByName(name);
@@ -1817,6 +2109,13 @@ public class Clowder {
 			surrenderTributeUntil = 0L;
 		}
 
+		// Vassal tribute: if this faction is a vassal, send a portion of its generation to the suzerain.
+		if(isVassal() && suzerain != null && XFConfig.vassalSystemEnabled) {
+			float vassalTribute = Math.max(0F, isInfrastructureDisabled() ? 0F : prestigeGen) * XFConfig.vassalPrestigeTransferPercent;
+			net -= vassalTribute;
+			suzerain.addPrestige(vassalTribute, world);
+		}
+
 		addPrestige(net, world);
 		lastBankruptcyStage = getBankruptcyStage();
 		notifyBankruptcyStage(world, oldStage, lastBankruptcyStage);
@@ -1953,6 +2252,15 @@ public class Clowder {
 		nbt.setString(i + "_enemy",this.enemyS);
 
 		nbt.setString(i + "_suzerain",this.suzerainS);
+
+		// if my vassal system that took 3 DAYS to make break im going to fucking choke someone. FUCK. MY. JAVA. CODE.
+		nbt.setInteger(i + "_vassals", this.vassalS.size());
+		int vassalIndex = 0;
+		for(String vassalName : this.vassalS) {
+			nbt.setString(i + "_vassal_" + vassalIndex, vassalName);
+			vassalIndex++;
+		}
+// gee ragex why did you remove vassals? did bob+weeder code cuck you?
 
 		nbt.setString(i + "_leader", this.leader);
 		nbt.setInteger(i + "_members", this.members.size());
@@ -2152,6 +2460,21 @@ public class Clowder {
 		c.enemyS = nbt.getString(i + "_enemy");
 		c.suzerainS = nbt.getString(i + "_suzerain");
 		c.vassalTarget = nbt.getBoolean(i + "_vassalTarget");
+
+		// Load vassal list bc im stupid
+		if(nbt.hasKey(i + "_vassals")) {
+			int vassalCount = nbt.getInteger(i + "_vassals");
+			for(int j = 0; j < vassalCount; j++) {
+				String vassalName = nbt.getString(i + "_vassal_" + j);
+				if(vassalName != null && !vassalName.isEmpty() && !vassalName.equals("nobody2584369")) {
+					c.vassalS.add(vassalName);
+					Clowder vassal = getClowderFromName(vassalName);
+					if(vassal != null) {
+						c.vassals.add(vassal);
+					}
+				}
+			}
+		}
 
 		//poorly coded treaty
 		c.treaty1 = nbt.getString(i + "_treaty1");

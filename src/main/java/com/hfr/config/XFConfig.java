@@ -165,6 +165,12 @@ public final class XFConfig {
 	public static boolean alliesCanJoinWars = true;
 	public static boolean alliesCanDeclareWarOnEachOther = false;
 
+	// chud vassal system
+	public static boolean vassalSystemEnabled = true;
+	public static float vassalPrestigeTransferPercent = 0.25F;
+	public static int vassalTitleLevelLimit = 2;
+	public static boolean vassalOwnerCommandsDelegated = true;
+
 	public static long pvpGraceDurationMs = 4L * 60L * 60L * 1000L;
 	public static long keepInventoryDurationMs = 24L * 60L * 60L * 1000L;
 	public static boolean graceBuildEnabled = true;
@@ -338,6 +344,11 @@ public final class XFConfig {
 		allianceBreakCooldownMs = hours(config, CAT_WAR, "allianceBreakCooldownHours", 24D, 0D, 24D * 365D, "No-war cooldown after breaking an alliance.");
 		alliesCanJoinWars = bool(config, CAT_WAR, "alliesCanJoinWars", alliesCanJoinWars, "Allows /c defendally to join active wars for allies.");
 		alliesCanDeclareWarOnEachOther = bool(config, CAT_WAR, "alliesCanDeclareWarOnEachOther", alliesCanDeclareWarOnEachOther, "Allows allied factions to declare war on each other. Default false.");
+
+		vassalSystemEnabled = bool(config, CAT_WAR, "vassalSystemEnabled", vassalSystemEnabled, "Enables the vassal/suzerain system where a stronger faction may vassalize a weaker one after peace.");
+		vassalPrestigeTransferPercent = flt(config, CAT_WAR, "vassalPrestigeTransferPercent", vassalPrestigeTransferPercent, 0F, 1F, "Fraction of vassal prestige generation sent to the suzerain each hour.");
+		vassalTitleLevelLimit = integer(config, CAT_WAR, "vassalTitleLevelLimit", vassalTitleLevelLimit, 0, 10, "Maximum title levels a vassal may advance below the suzerain's current title level.");
+		vassalOwnerCommandsDelegated = bool(config, CAT_WAR, "vassalOwnerCommandsDelegated", vassalOwnerCommandsDelegated, "If true, a suzerain's owner may use rename/flag commands on vassal factions.");
 
 		pvpGraceDurationMs = hours(config, CAT_PROTECTION, "pvpGraceDurationHours", 4D, 0D, 24D * 365D, "PvP grace duration for first-time players.");
 		keepInventoryDurationMs = hours(config, CAT_PROTECTION, "keepInventoryDurationHours", 24D, 0D, 24D * 365D, "Keep-inventory duration recorded for first-time players.");

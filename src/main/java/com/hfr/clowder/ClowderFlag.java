@@ -21,7 +21,7 @@ public enum ClowderFlag {
 	ASTERISK("asterisk"),
 	PONYCUM("pc", false),
 	SPACEFLAG("spaceflag", true, true, true),
-	GER-fascist-censored("GER-fascist-censored", true, true, true);
+	GERfascistcensored("GER-fascist-censored", true, true, true);
 
 	public String name = "";
 	public boolean show = true;

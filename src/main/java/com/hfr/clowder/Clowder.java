@@ -1149,7 +1149,7 @@ public class Clowder {
 		return true;
 	}
 
-	// TODO: adda revolt option bc i fucking hate my life
+	// TODO: add a revolt option bc i fucking hate my life
 
 	/** Returns the number of prestige title levels between two factions based on their current titles. */
 	public static int titleLevelDifference(Clowder a, Clowder b) {
